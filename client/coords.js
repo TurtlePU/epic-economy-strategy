@@ -88,3 +88,34 @@ function offset_reaches(offset, r) {
     });
     return result;
 }
+
+//(0, 0) in the center of hex[0][0]
+const sqrt3 = Math.sqrt(3);
+function offset_to_pixel(offset, size) {
+    let x = size * sqrt3 * (offset.col + 0.5 * (offset.row & 1)),
+        y = size * 3 / 2 * offset.row;
+    return Point(x, y);
+}
+function pixel_to_cube(pixel, size) {
+    let x = (pixel.x * sqrt3 / 3 - pixel.y / 3) / size,
+        z = y * 2 / 3 / size;
+    return Cube(x, -x - z, z);
+}
+function round_cube(cube) {
+    with (Math) {
+        var rx = round(cube.x),
+            ry = round(cube.y),
+            rz = round(cube.z),
+
+            dx = abs(rx - cube.x),
+            dy = abs(ry - cube.y),
+            dz = abs(rz - cube.z);
+    }
+    if (dx >= dy && dx >= dz) rx = -ry - rz;
+    else if (dy >= dz) ry = -rx - rz;
+    else rz = -rx - ry;
+    return Cube(rx, ry, rz);
+}
+function pixel_to_offset(pixel, size) {
+    return offset_coords(round_cube(pixel_to_cube(pixel, size)));
+}
