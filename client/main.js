@@ -116,8 +116,8 @@ var gameBootstrapper = {
 		corner = coords.point_substract(focus, shift);
 
 		socket.emit('new_player', {
-			socket.id,
-			coords.pixel_to_offset(shift, hex_size, corner) 
+			id: socket.id,
+			spawn: coords.pixel_to_offset(shift, hex_size, corner) 
 		});
 		//maybe unfinished camera
 	}
