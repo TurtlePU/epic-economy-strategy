@@ -7,6 +7,8 @@ const game = new Phaser.Game(innerWidth, innerHeight,
 var gameProperties = {
 	game_width: 4000,
 	game_height: 4000,
+	hex_size: 40,
+	chunk_params: coords.ChunkParams(3, 3),
 	game_element: 'gameDiv',
 	in_game: false
 };
@@ -62,10 +64,10 @@ function onFieldDown(sprite, pointer) {
 function request_chunks() {
 	socket.emit('chunks_requested', {
 		topleft: coords.pixel_to_chunk(
-			{px_x: 0, px_y: 0}, hex_size, corner),
+			{px_x: 0, px_y: 0}, gameProperties.hex_size, corner),
 		bottomright: coords.pixel_to_chunk(
 			{px_x: innerWidth, px_y: innerHeight},
-			hex_size, corner)
+			gameProperties.hex_size, corner)
 	});
 };
 
@@ -87,10 +89,12 @@ function append_chunk_if_needed(chunk) {
 		chunk, 
 		coords.pixel_to_chunk(
 			coords.Point(0, 0),
-			hex_size, corner, chunk_params),
+			gameProperties.hex_size, corner, 
+			gameProperties.chunk_params),
 		coords.pixel_to_chunk(
 			coords.Point(innerWidth, innerHeight),
-			hex_size, corner, chunk_params))
+			gameProperties.hex_size, corner, 
+			gameProperties.chunk_params))
 		)
 		chunks_list.push(chunk);
 };
@@ -103,15 +107,17 @@ var gameBootstrapper = {
 	init: function(gameContainerElementId) {
 		game.state.add('main', main);
 		game.state.start('main');
+		//rand_free_space - unfinished method
 		var spawn_point = rand_free_space();
 		camera = new Phaser.Camera(game, 0, 
-			spawn_point.x,
-			spawn_point.y,
+			spawn_point.col,
+			spawn_point.row,
 			innerWidth,
 			innerHeight
 		);
 
-		focus = spawn_point;
+		focus = coords.offset_to_pixel(spawn_point, 
+			gameProperties.hex_size, coords.Point(0, 0));
 		var shift = coords.Point(innerWidth / 2, innerHeight / 2);
 		corner = coords.point_substract(focus, shift);
 
