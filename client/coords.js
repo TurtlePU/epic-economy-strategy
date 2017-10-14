@@ -14,6 +14,11 @@ Point = function (tx, ty) {
     var px_y = ty;
 };
 
+ChunkParams = function (tx, ty) {
+	var width = tx;
+	var height = ty;
+}
+
 function hex_corner(center, size, i) {
     with (Math) {
         var angle = PI * i / 3 + PI / 6;
@@ -21,7 +26,7 @@ function hex_corner(center, size, i) {
     }
 };
 
-//нечет-r
+//odd-r
 function offset_coords(cube) {
     return Offset(cube.z, cube.x + (cube.z - (cube.z & 1)) / 2);
 };
@@ -91,10 +96,10 @@ function offset_reaches(offset, r) {
 
 //(0, 0) in the center of hex[0][0]
 const sqrt3 = Math.sqrt(3);
-function offset_to_pixel(offset, size) {
+function offset_to_pixel(offset, size, window) {
     let x = size * sqrt3 * (offset.col + 0.5 * (offset.row & 1)),
         y = size * 3 / 2 * offset.row;
-    return Point(x, y);
+    return point_substract(Point(x, y), window.topleft);
 }
 function pixel_to_cube(pixel, size) {
     let x = (pixel.x * sqrt3 / 3 - pixel.y / 3) / size,
@@ -116,6 +121,22 @@ function round_cube(cube) {
     else rz = -rx - ry;
     return Cube(rx, ry, rz);
 }
-function pixel_to_offset(pixel, size) {
-    return offset_coords(round_cube(pixel_to_cube(pixel, size)));
+function pixel_to_offset(pixel, size, window) {
+    return offset_coords(round_cube(pixel_to_cube(point_add(pixel, window.topleft), size)));
+}
+
+function point_substract(a, b) {
+	return Point(a.x - b.x, a.y - b.y);
+}
+function point_add(a, b) {
+	return Point(a.x + b.x, a.y + b.y);
+}
+
+function hex_to_chunk(hex, chunk_params) {
+	with (Math) {
+		return {
+			x_of_chunk: floor(hex.x / chunk_params.width),
+			y_of_chunk: floor(hex.y / chunk_params.height)
+		};
+	}
 }

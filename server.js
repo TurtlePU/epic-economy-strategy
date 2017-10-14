@@ -19,7 +19,7 @@ var Player = function(
 
 io.sockets.on('connection', function(socket) {
 	socket.on('new_player', function(new_player_data) {
-		var new_player = new Player(new_player_data);
+		var new_player = new Player(new_player_data.id);
 		player_list.push(new_player);
 	});
 	//another events

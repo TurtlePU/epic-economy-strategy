@@ -1,4 +1,5 @@
 const socket = io.connect();
+const coords = require('./coords.js');
 
 const game = new Phaser.Game(innerWidth, innerHeight,
 	Phaser.AUTO, 'gameDiv');
@@ -33,13 +34,38 @@ main.prototype = {
 				id: socket.id
 			});
 		});
+
+		var field_group = game.add.group();
+		var bounds = game.world.getBounds()
+		var field = field_group.create(field.x, field.y, 'field');
+		
+		field.inputEnabled = true;
+		field.input.enableDrag();
+		field.events.onDragStart.add(onFieldDragStart, this);
+		field.events.onDragStop.add(onFieldDragStop, this);
+		field.events.onInputDown.add(onFieldDown, this);
 	},
 	
 	update: function() {
 		if (gameProperties.in_game) {
 			//handling commands
+
 		}
+	},
+
+	render: function() {
+		//render
 	}
+};
+
+function onFieldDragStart(sprite, pointer) {
+
+};
+function onFieldDragStop(sprite, pointer) {
+
+};
+function onFieldDown(sprite, pointer) {
+
 };
 
 function createPlayer() {
