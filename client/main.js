@@ -67,7 +67,6 @@ function request_chunks() {
 			{px_x: innerWidth, px_y: innerHeight},
 			hex_size, corner)
 	});
-
 };
 
 var chunks_list = [];
