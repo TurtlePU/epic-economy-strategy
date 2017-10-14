@@ -101,10 +101,10 @@ function offset_reaches(offset, r) {
 
 //(0, 0) in the center of hex[0][0]
 const sqrt3 = Math.sqrt(3);
-function offset_to_pixel(offset, size, window) {
+function offset_to_pixel(offset, size, topleft) {
     let x = size * sqrt3 * (offset.col + 0.5 * (offset.row & 1)),
         y = size * 3 / 2 * offset.row;
-    return point_substract(Point(x, y), window.topleft);
+    return point_substract(Point(x, y), topleft);
 };
 function pixel_to_cube(pixel, size) {
     let x = (pixel.x * sqrt3 / 3 - pixel.y / 3) / size,
