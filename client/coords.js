@@ -14,6 +14,11 @@ Point = function (tx, ty) {
     var px_y = ty;
 };
 
+Chunk = function(tx, ty) {
+	var x = tx;
+	var y = ty;
+}
+
 ChunkParams = function (tx, ty) {
 	var width = tx;
 	var height = ty;
@@ -134,10 +139,10 @@ function point_add(a, b) {
 
 function offset_to_chunk(offset, chunk_params) {
 	with (Math) {
-		return {
-			x_of_chunk: floor(offset.col / chunk_params.width),
-			y_of_chunk: floor(offset.row / chunk_params.height)
-		};
+		return Chunk(
+			floor(offset.col / chunk_params.width),
+			floor(offset.row / chunk_params.height)
+		);
 	}
 };
 function pixel_to_chunk(pixel, size, topleft, chunk_params) {
@@ -146,3 +151,9 @@ function pixel_to_chunk(pixel, size, topleft, chunk_params) {
 		chunk_params
 	);
 };
+function chunk_inside(chunk, bord1, bord2) {
+	return bord1.x <= chunk.x &&
+		   bord2.x >= chunk.x &&
+		   bord1.y <= chunk.y &&
+		   bord2.y >= chunk.y;
+}

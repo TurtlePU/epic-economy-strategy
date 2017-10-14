@@ -59,14 +59,41 @@ function onFieldDown(sprite, pointer) {
 
 };
 
-function request_chunks(bounds) {
+function request_chunks() {
 	socket.emit('chunks_requested', {
-		topleft: 
+		topleft: coords.pixel_to_chunk(
+			{px_x: 0, px_y: 0}, hex_size, corner),
+		bottomright: coords.pixel_to_chunk(
+			{px_x: innerWidth, px_y: innerHeight},
+			hex_size, corner)
+	});
+
+};
+
+var chunks_list = [];
+function render() {
+	//render
+};
+
+socket.on('chunks_received', append_chunks);
+function append_chunks(chunk_table) {
+	chunk_table.forEach(function(item, index, array) {
+		chunks_list.push(item);
 	});
 };
 
-function render() {
-	//render
+socket.on('chunk_updated', append_chunk_if_needed);
+function append_chunk_if_needed(chunk) {
+	if (coords.chunk_inside(
+		chunk, 
+		coords.pixel_to_chunk(
+			coords.Point(0, 0),
+			hex_size, corner, chunk_params),
+		coords.pixel_to_chunk(
+			coords.Point(innerWidth, innerHeight),
+			hex_size, corner, chunk_params))
+		)
+		chunks_list.push(chunk);
 };
 
 function createPlayer() {
