@@ -121,8 +121,8 @@ function round_cube(cube) {
     else rz = -rx - ry;
     return Cube(rx, ry, rz);
 }
-function pixel_to_offset(pixel, size, window) {
-    return offset_coords(round_cube(pixel_to_cube(point_add(pixel, window.topleft), size)));
+function pixel_to_offset(pixel, size, topleft) {
+    return offset_coords(round_cube(pixel_to_cube(point_add(pixel, topleft), size)));
 }
 
 function point_substract(a, b) {
