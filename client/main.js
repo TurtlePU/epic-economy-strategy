@@ -34,10 +34,6 @@ function create() {
 	socket.on('connect', function() {
 		createPlayer();
 		gameProperties.in_game = true;
-		socket.emit('new_player', {
-			//data of new player
-			id: socket.id
-		});
 	});
 
 	var field_group = game.add.group();
@@ -52,6 +48,7 @@ function create() {
 };
 
 var camera;
+var corner, focus;
 function onFieldDragStart(sprite, pointer) {
 	//start dragging
 };
@@ -64,7 +61,7 @@ function onFieldDown(sprite, pointer) {
 
 function request_chunks(bounds) {
 	socket.emit('chunks_requested', {
-		//
+		topleft: 
 	});
 };
 
@@ -80,14 +77,22 @@ var gameBootstrapper = {
 	init: function(gameContainerElementId) {
 		game.state.add('main', main);
 		game.state.start('main');
+		var spawn_point = rand_free_space();
 		camera = new Phaser.Camera(game, 0, 
-			rand_in_range(innerWidth / 2, 
-				gameProperties.game_Width - innerWidth / 2),
-			rand_in_range(innerHeight / 2,
-				gameProperties.game_Height - innerHeight / 2),
+			spawn_point.x,
+			spawn_point.y,
 			innerWidth,
 			innerHeight
 		);
+
+		focus = spawn_point;
+		var shift = coords.Point(innerWidth / 2, innerHeight / 2);
+		corner = coords.point_substract(focus, shift);
+
+		socket.emit('new_player', {
+			socket.id,
+			coords.pixel_to_offset(shift, hex_size, corner) 
+		});
 		//maybe unfinished camera
 	}
 };
