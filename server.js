@@ -34,7 +34,7 @@ io.sockets.on('connection', function(socket) {
 		socket.emit('chunks_received', res_list);
 	});
 	socket.on('chunk_updated_send', function(chunk) {
-		field[chunk.x + '_' + chunk.j] = chunk;
+		field[chunk.i + '_' + chunk.j] = chunk;
 		io.emit('chunk_updated', chunk);
 	});
 	//another events
