@@ -18,6 +18,7 @@ var Player = function(
 	var spawn = player_spawn;
 };
 
+var field = [];
 io.sockets.on('connection', function(socket) {
 	socket.on('new_player', function(data) {
 		var new_player = new Player(data.id, data.spawn);
@@ -26,17 +27,14 @@ io.sockets.on('connection', function(socket) {
 	socket.on('chunks_requested', function(bounds) {
 		var res_list = [];
 		for (let i = bounds.topleft.y; 
-			i <= bounds.bottomright.y; ++i) {
-			let t_list = [];
+			i <= bounds.bottomright.y; ++i)
 			for (let j = bounds.topleft.x;
 				j <= bouns.bottomright.x; ++j)
-				t_list.push(field[i][j]);
-			res_list.push(t_list);
-		}
+				res_list.push(field[i + '_' + j]);
 		socket.emit('chunks_received', res_list);
 	});
 	socket.on('chunk_updated_send', function(chunk) {
-		field[chunk.x][chunk.j] = chunk;
+		field[chunk.x + '_' + chunk.j] = chunk;
 		io.emit('chunk_updated', chunk);
 	});
 	//another events
