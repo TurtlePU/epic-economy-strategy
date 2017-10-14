@@ -132,11 +132,11 @@ function point_add(a, b) {
 	return Point(a.x + b.x, a.y + b.y);
 }
 
-function hex_to_chunk(hex, chunk_params) {
+function offset_to_chunk(offset, chunk_params) {
 	with (Math) {
 		return {
-			x_of_chunk: floor(hex.x / chunk_params.width),
-			y_of_chunk: floor(hex.y / chunk_params.height)
+			x_of_chunk: floor(offset.col / chunk_params.width),
+			y_of_chunk: floor(offset.row / chunk_params.height)
 		};
 	}
 }
