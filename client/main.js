@@ -49,7 +49,7 @@ function create() {
 
 var camera;
 var corner, focus;
-function onFieldDragStart(sprite, pointer) {
+function onFieldDragStart(sprite, pointer, x, y) {
 	//start dragging
 };
 function onFieldDragStop(sprite, pointer) {
