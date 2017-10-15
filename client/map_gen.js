@@ -1,12 +1,7 @@
 var PseudoRandom = function(a, b, c, mod, seed) {
-	this.a = a;
-	this.b = b;
-	this.c = c;
-	this.mod = mod;
-
-	this.elem = seed;
-	this.prev = 0;
-	function getNext() {
+	var elem = seed;
+	var prev = 0;
+	this.getNext = function() {
 		var t = (a * elem + b * prev + c) % mod;
 		prev = elem;
 		elem = t;
@@ -19,6 +14,10 @@ function getRanged(rand, from, to) {
 };
 
 function middle(a, b, c, d) {
+	if (a == undefined) a = 0;
+	if (b == undefined) b = 0;
+	if (c == undefined) c = 0;
+	if (d == undefined) d = 0;
 	return (a + b + c + d) / 4;
 };
 
@@ -26,7 +25,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 	var gen = new PseudoRandom(a, b, c, mod, seed);
 
 	var map = [];
-	var size = Math.pow((1 << log_size) + 1, 2);
+	var size = (1 << log_size) + 1;
 
 	var getInHeight = function() {
 		return getRanged(gen.getNext(), 0, height);
@@ -42,7 +41,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			mj = Math.floor((j1 + j2) / 2);
 
 		if (mi < 0 || mj < 0 ||
-			mi > size || mj > size || 
+			mi >= size || mj >= size || 
 			mi == i1 || mj == j1 || 
 			map[mi + '_' + mi] != undefined) return;
 
@@ -63,7 +62,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			mj = Math.floor((j1 + j2) / 2);
 
 		if (mi < 0 || mj < 0 ||
-			mi > size || mj > size || 
+			mi >= size || mj >= size || 
 			mi == i1 || mj == j1 || 
 			map[mi + '_' + mj] != undefined) return;
 
