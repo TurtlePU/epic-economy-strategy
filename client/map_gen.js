@@ -18,19 +18,19 @@ function getRanged(rand, from, to) {
 	return (to - from + 1) * rand + from;
 };
 
+function middle(a, b, c, d) {
+	return (a + b + c + d) / 4;
+};
+
 function diamond_square(a, b, c, mod, seed, log_size, height) {
 	var gen = new PseudoRandom(a, b, c, mod, seed);
 
 	var map = [];
-	var size = (1 << log_size) + 1;
-	for (let i = 0; i < size; ++i) {
-		let t = [];
-		map.push(t);
-	}
+	var size = Math.pow((1 << log_size) + 1, 2);
 
 	var getInHeight = function() {
 		return getRanged(gen.getNext(), 0, height);
-	}
+	};
 
 	map['0_0'] = getInHeight();
 	map['0_' + (size - 1)] = getInHeight();
@@ -38,13 +38,15 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 	map[(size - 1) + '_' + (size - 1)] = getInHeight();
 
 	function square(dep, i1, j1, i2, j2) {
-		var mi = Math.floor((i1 + i2) / 2),
+		let mi = Math.floor((i1 + i2) / 2),
 			mj = Math.floor((j1 + j2) / 2);
 
-		if (mi == i1 || mj == j1 || 
-			map[mx + '_' + my] != undefined) return;
+		if (mi < 0 || mj < 0 ||
+			mi > size || mj > size || 
+			mi == i1 || mj == j1 || 
+			map[mi + '_' + mi] != undefined) return;
 
-		map[mx + '_' + my] = middle(
+		map[mi + '_' + mj] = middle(
 			map[i1 + '_' + j1],
 			map[i1 + '_' + j2],
 			map[i2 + '_' + j2],
@@ -57,8 +59,27 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 		diamond(dep + 1, i1, j1 - (mj - j1), i2, mj);
 	};
 	function diamond(dep, i1, j1, i2, j2) {
+		let mi = Math.floor((i1 + i2) / 2),
+			mj = Math.floor((j1 + j2) / 2);
 
+		if (mi < 0 || mj < 0 ||
+			mi > size || mj > size || 
+			mi == i1 || mj == j1 || 
+			map[mi + '_' + mj] != undefined) return;
+
+		map[mi + '_' + mj] = middle(
+			map[i1 + '_' + mj],
+			map[i2 + '_' + mj],
+			map[mi + '_' + j1],
+			map[mi + '_' + j2]
+		) + getRanged(gen.getNext(), -height / dep, height / dep);
+
+		square(dep + 1, i1, j1, mi, mj);
+		square(dep + 1, i1, mj, mi, j2);
+		square(dep + 1, mi, j1, i2, mj);
+		square(dep + 1, mi, mj, i2, j2);
 	};
 
 	square(2, 0, 0, size - 1, size - 1);
+	return map;
 };
