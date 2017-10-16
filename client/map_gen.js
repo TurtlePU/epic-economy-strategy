@@ -42,8 +42,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 
 		if (mi < 0 || mj < 0 ||
 			mi >= size || mj >= size || 
-			mi == i1 || mj == j1 || 
-			map[mi + '_' + mi] != undefined) return;
+			mi == i1 || mj == j1) return;
 
 		map[mi + '_' + mj] = middle(
 			map[i1 + '_' + j1],
@@ -63,8 +62,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 
 		if (mi < 0 || mj < 0 ||
 			mi >= size || mj >= size || 
-			mi == i1 || mj == j1 || 
-			map[mi + '_' + mj] != undefined) return;
+			mi == i1 || mj == j1) return;
 
 		map[mi + '_' + mj] = middle(
 			map[i1 + '_' + mj],
