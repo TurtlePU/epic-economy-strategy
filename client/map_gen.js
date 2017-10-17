@@ -1,3 +1,40 @@
+function distributed_resource_map(pack) {
+	var map = resource_map(pack);
+	//unfinished
+};
+
+function resource_map(pack) {
+	var map = diamond_square(pack.a, pack.b, pack.c,
+		pack.mod, pack.seed, pack.log_size, pack.height);
+
+	var res = [];
+	var gen = new PseudoRandom(pack.prob_a, pack.prob_b, pack.prob_c, 
+		pack.prob_mod, pack.prob_seed);
+
+	function getProb(depth) {
+		let ratio = depth / pack.height;
+		if (ratio <= -0.8)
+			return 0.21;
+		if (ratio <= -0.6)
+			return 0.14;
+		if (ratio <= -0.2)
+			return 0.07;
+		if (ratio <= 0)
+			return 0.21;
+		if (ratio <= 0.2)
+			return 0.42;
+		if (ratio <= 0.4)
+			return 0.63;
+		return 0.84;
+	};
+
+	var size = (1 << log_size) + 1;
+	for (let i = 0; i < size; ++i)
+		for (let j = 0; j < size; ++j)
+			res[i + '_' + j] = 
+				(gen.getNext() < getProb(map[i + '_' + j])) ? 1 : 0;
+};
+
 var PseudoRandom = function(a, b, c, mod, seed) {
 	var elem = seed;
 	var prev = 0;
@@ -37,7 +74,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			map[i2 + '_' + j2] +
 			map[i2 + '_' + j1]
 			) / 4 + getDep(dep);
-	}
+	};
 
 	let tmp_mi = Math.floor((size - 1) / 2),
 		tmp_mj = Math.floor((size - 1) / 2);
@@ -49,7 +86,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			map[i2 + '_' + j2] +
 			map[mi + '_' + mj]
 			) / 3 + getDep(dep);
-	}
+	};
 
 	map[0 + '_' + tmp_mj] = getSide(0, 0, 0, size - 1, tmp_mi, tmp_mj, 2);
 	map[tmp_mi + '_' + (size - 1)] = getSide(0, size - 1, size - 1, size - 1, tmp_mi, tmp_mj, 2);
