@@ -1,6 +1,17 @@
 function distributed_resource_map(pack) {
 	var map = resource_map(pack);
-	//unfinished
+	//maybe we can find better distibution
+	var res = [];
+	var size = (1 << pack.log_size) + 1;
+	var count = 1;
+	for (let i = 0; i < size; ++i)
+		for (let j = 0; j < size; ++j)
+			if (map[i + '_' + j]) {
+				res[i + '_' + j] = count;
+				if (count == 3) count = 1;
+				else ++count;
+			} else res[i + '_' + j] = 0;
+	return res;
 };
 
 function resource_map(pack) {
@@ -32,7 +43,8 @@ function resource_map(pack) {
 	for (let i = 0; i < size; ++i)
 		for (let j = 0; j < size; ++j)
 			res[i + '_' + j] = 
-				(gen.getNext() < getProb(map[i + '_' + j])) ? 1 : 0;
+				(gen.getNext() < getProb(map[i + '_' + j]));
+	return res;
 };
 
 var PseudoRandom = function(a, b, c, mod, seed) {
@@ -75,10 +87,6 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			map[i2 + '_' + j1]
 			) / 4 + getDep(dep);
 	};
-
-	let tmp_mi = Math.floor((size - 1) / 2),
-		tmp_mj = Math.floor((size - 1) / 2);
-	map[tmp_mi + '_' + tmp_mj] = getMiddle(0, 0, size - 1, size - 1, 2);
 	
 	function getSide(i1, j1, i2, j2, mi, mj, dep) {
 		return (
@@ -88,11 +96,6 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 			) / 3 + getDep(dep);
 	};
 
-	map[0 + '_' + tmp_mj] = getSide(0, 0, 0, size - 1, tmp_mi, tmp_mj, 2);
-	map[tmp_mi + '_' + (size - 1)] = getSide(0, size - 1, size - 1, size - 1, tmp_mi, tmp_mj, 2);
-	map[(size - 1) + '_' + tmp_mj] = getSide(size - 1, size - 1, size - 1, 0, tmp_mi, tmp_mj, 2);
-	map[tmp_mi + '_' + 0] = getSide(size - 1, 0, 0, 0, tmp_mi, tmp_mj, 2);
-	
 	function square(dep, i1, j1, i2, j2) {
 		let mi = Math.floor((i1 + i2) / 2),
 			mj = Math.floor((j1 + j2) / 2);
@@ -113,10 +116,7 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 		square(dep + 1, mi, j1, i2, mj);
 	};
 
-	square(3, 0, 0, tmp_mi, tmp_mj);
-	square(3, 0, tmp_mj, tmp_mi, size - 1);
-	square(3, tmp_mi, tmp_mj, size - 1, size - 1);
-	square(3, tmp_mi, 0, size - 1, tmp_mj);
+	square(2, 0, 0, size - 1, size - 1);
 
 	return map;
 };
