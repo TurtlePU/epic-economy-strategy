@@ -39,7 +39,7 @@ function resource_map(pack) {
 		return 0.84;
 	};
 
-	var size = (1 << log_size) + 1;
+	var size = (1 << pack.log_size) + 1;
 	for (let i = 0; i < size; ++i)
 		for (let j = 0; j < size; ++j)
 			res[i + '_' + j] = 
