@@ -53,6 +53,42 @@ function create() {
 		var map = map_gen.distributed_resource_map(pack);
 		var graphics = game.add.graphics(0, 0);
 		//draw map - only hexes and resources
+		var size = (1 << pack.log_size) + 1;
+		for (let i = 0; i < size; ++i)
+			for (let j = 0; j < size; ++j) {
+				let center = coords.offset_to_pixel(
+					{row: i, col: j}, 
+					gameProperties.hex_size, 
+					{px_x: 0, px_y: 0}
+				);
+
+				graphics.beginFill(getColor(map[i + '_' + j]));
+				function getColor(index) {
+					switch(index) {
+						case 0:
+						return 0x000000;
+						case 1:
+						return 0x960018;
+						case 2:
+						return 0x1cd3a2;
+						case 3:
+						return 0x9932cc;
+					}
+				};
+
+    			graphics.lineStyle(1, 0x000000, 1);
+
+				let t = coords.hex_corner(center, gameProperties.hex_size, 5);
+				graphics.moveTo(t.px_x, t.px_y);
+				for (let k = 0; k < 6; ++k) {
+					t = coords.hex_corner(center, gameProperties.hex_size, k);
+					graphics.lineTo(t.px_x, t.px_y);
+				}
+
+				graphics.endFill();
+			}
+
+		window.graphics = graphics;
 	});
 };
 
