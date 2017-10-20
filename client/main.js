@@ -1,8 +1,10 @@
 const socket = io.connect();
 const coords = require('./coords.js');
+const map_gen = require('./map_gen.js');
 
 const game = new Phaser.Game(innerWidth, innerHeight,
 	Phaser.AUTO, 'gameDiv');
+const camera;
 
 var gameProperties = {
 	game_width: 4000,
@@ -17,6 +19,7 @@ var main = function(game){};
 main.prototype = {
 	preload: preload,
 	create: create,
+	update: update,
 	render: render
 };
 
@@ -37,29 +40,23 @@ function create() {
 		createPlayer();
 		gameProperties.in_game = true;
 	});
-
-	var field_group = game.add.group();
-	var bounds = game.world.getBounds()
-	var field = field_group.create(bounds.x, bounds.y, 'field');
-		
-	field.inputEnabled = true;
-	field.input.enableDrag();
-	field.events.onDragStart.add(onFieldDragStart, this);
-	field.events.onDragStop.add(onFieldDragStop, this);
-	field.events.onInputDown.add(onFieldDown, this);
+	socket.on('player_send', function(spawn) {
+		spawn_point = spawn;
+		focus = coords.offset_to_pixel(spawn, 
+			gameProperties.hex_size, coords.Point(0, 0));
+		var shift = coords.Point(innerWidth / 2, innerHeight / 2);
+		corner = coords.point_substract(focus, shift);
+		game.camera.x = focus.px_x;
+		game.camera.y = focus.px_y;
+	});
+	socket.on('map_send', function(pack) {
+		var map = map_gen.distributed_resource_map(pack);
+		var graphics = game.add.graphics(0, 0);
+		//draw map - only hexes and resources
+	});
 };
 
-var camera;
-var corner, focus;
-function onFieldDragStart(sprite, pointer, x, y) {
-	//start dragging
-};
-function onFieldDragStop(sprite, pointer) {
-	//release drag
-};
-function onFieldDown(sprite, pointer) {
-
-};
+var spawn_point, corner, focus;
 
 function request_chunks() {
 	socket.emit('chunks_requested', {
@@ -71,15 +68,57 @@ function request_chunks() {
 	});
 };
 
+function update() {
+	if (game.input.activePointer.isDown) {	
+		if (game.origDragPoint) {		
+			var old_chunk = coords.pixel_to_chunk(
+				coords.Point(0, 0),
+				gameProperties.hex_size, corner, 
+				gameProperties.chunk_params);
+
+			game.camera.x += game.origDragPoint.x - game.input.activePointer.position.x;		
+			game.camera.y += game.origDragPoint.y - game.input.activePointer.position.y;
+			
+			corner.px_x += game.origDragPoint.x - game.input.activePointer.position.x;
+			corner.px_y += game.origDragPoint.y - game.input.activePointer.position.y;
+
+			var new_chunk = coords.pixel_to_chunk(
+				coords.Point(0, 0),
+				gameProperties.hex_size, corner, 
+				gameProperties.chunk_params);
+
+			if (old_chunk != new_chunk)
+				socket.emit('chunks_requested', {
+					topleft: new_chunk,
+					bottomright: coords.pixel_to_chunk(
+						coords.Point(innerWidth, innerHeight),
+						gameProperties.hex_size, corner, 
+						gameProperties.chunk_params)
+				});
+		}	
+		game.origDragPoint = game.input.activePointer.position.clone();
+	}
+	else {	
+		game.origDragPoint = null;
+	}
+};
+
 var chunks_list = [];
 function render() {
-	//render
+	var size = chunks_list.length;
+	for (let i = 0; i < size; ++i)
+		draw(chunks_list[i]);
+	chunks_list.slice(size);
+};
+function draw(chunk) {
+//TODO: draws only buildings with owner's color
 };
 
 socket.on('chunks_received', append_chunks);
 function append_chunks(chunk_table) {
 	chunk_table.forEach(function(item, index, array) {
-		chunks_list.push(item);
+		if (!chunks_list.includes(item))
+			chunks_list.push(item);
 	});
 };
 
@@ -107,25 +146,10 @@ var gameBootstrapper = {
 	init: function(gameContainerElementId) {
 		game.state.add('main', main);
 		game.state.start('main');
-		//rand_free_space - unfinished method
-		var spawn_point = rand_free_space();
-		camera = new Phaser.Camera(game, 0, 
-			spawn_point.col,
-			spawn_point.row,
-			innerWidth,
-			innerHeight
-		);
-
-		focus = coords.offset_to_pixel(spawn_point, 
-			gameProperties.hex_size, coords.Point(0, 0));
-		var shift = coords.Point(innerWidth / 2, innerHeight / 2);
-		corner = coords.point_substract(focus, shift);
-
 		socket.emit('new_player', {
 			id: socket.id,
-			spawn: coords.pixel_to_offset(shift, hex_size, corner) 
+			//maybe smth else
 		});
-		//maybe unfinished camera
 	}
 };
 

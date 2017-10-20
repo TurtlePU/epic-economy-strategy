@@ -9,27 +9,31 @@ app.use('/client', express.static(__dirname + '/client'));
 
 var player_list = [];
 var Player = function(
-	//new player data
 	player_id,
-	player_spawn
+	spawn_point
 ) {
-	//set new data
 	var id = player_id;
-	var spawn = player_spawn;
+	var spawn = spawn_point;
 };
 
 var field = [];
 io.sockets.on('connection', function(socket) {
 	socket.on('new_player', function(data) {
-		var new_player = new Player(data.id, data.spawn);
+		var start_new_map = !prepare_spawn();
+		var spawn = next_player();
+		var new_player = new Player(
+			data.id, spawn//another params
+		);
 		player_list.push(new_player);
+		socket.emit('spawn_send', spawn);
+		socket.emit('map_send', next_map(start_new_map));
 	});
 	socket.on('chunks_requested', function(bounds) {
 		var res_list = [];
-		for (let i = bounds.topleft.y; 
-			i <= bounds.bottomright.y; ++i)
-			for (let j = bounds.topleft.x;
-				j <= bouns.bottomright.x; ++j)
+		for (let i = bounds.topleft.x; 
+			i <= bounds.bottomright.x; ++i)
+			for (let j = bounds.topleft.y;
+				j <= bouns.bottomright.y; ++j)
 				res_list.push(field[i + '_' + j]);
 		socket.emit('chunks_received', res_list);
 	});
@@ -37,7 +41,35 @@ io.sockets.on('connection', function(socket) {
 		field[chunk.i + '_' + chunk.j] = chunk;
 		io.emit('chunk_updated', chunk);
 	});
+	
 	//another events
 });
+
+function prepare_spawn() {
+	return true;
+}
+
+function next_player() {
+	//will be different
+	return {x: 0, y: 0};
+}
+
+function next_map(new_map) {
+	//will be different
+	return {
+		a: 120,
+		b: 15,
+		c: 16,
+		mod: 228,
+		seed: 0,
+		log_size: 6,
+		height: 100,
+		prob_a: 15, 
+		prob_b: 5,
+		prob_c: -5,
+		prob_mod: 100,
+		prob_seed: 80
+	};
+};
 
 server.listen(3000);
