@@ -1,10 +1,11 @@
 const socket = io.connect();
-const coords = require('./coords.js');
-const map_gen = require('./map_gen.js');
+
+var coords = require('coords');
+var map_gen = require('map_gen');
 
 const game = new Phaser.Game(innerWidth, innerHeight,
 	Phaser.AUTO, 'gameDiv');
-const camera;
+var camera;
 
 var gameProperties = {
 	game_width: 4000,

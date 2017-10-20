@@ -120,3 +120,5 @@ function diamond_square(a, b, c, mod, seed, log_size, height) {
 
 	return map;
 };
+
+module.exports = this;

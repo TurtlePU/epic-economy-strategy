@@ -1,4 +1,5 @@
-const app = require('express')();
+const express = require('express');
+const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
@@ -18,6 +19,7 @@ var Player = function(
 
 var field = [];
 io.sockets.on('connection', function(socket) {
+	console.log("socket connected");
 	socket.on('new_player', function(data) {
 		var start_new_map = !prepare_spawn();
 		var spawn = next_player();
@@ -72,4 +74,4 @@ function next_map(new_map) {
 	};
 };
 
-server.listen(3000);
+server.listen(4000);

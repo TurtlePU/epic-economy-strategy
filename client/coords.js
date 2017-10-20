@@ -156,4 +156,6 @@ function chunk_inside(chunk, bord1, bord2) {
 		   bord2.x >= chunk.x &&
 		   bord1.y <= chunk.y &&
 		   bord2.y >= chunk.y;
-}
+};
+
+module.exports = this;
