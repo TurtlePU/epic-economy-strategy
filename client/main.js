@@ -1,17 +1,17 @@
 const socket = io.connect();
 
-var coords = require('coords');
-var map_gen = require('map_gen');
-
+const innerWidth = Math.floor(window.innerWidth / 1920 * 1000);
+	  innerHeight = Math.floor(window.innerHeight / 1080 * 1000);
 const game = new Phaser.Game(innerWidth, innerHeight,
 	Phaser.AUTO, 'gameDiv');
 var camera;
+var map;
 
 var gameProperties = {
 	game_width: 4000,
 	game_height: 4000,
 	hex_size: 40,
-	chunk_params: coords.ChunkParams(3, 3),
+	chunk_params: new ChunkParams(3, 3),
 	game_element: 'gameDiv',
 	in_game: false
 };
@@ -29,67 +29,28 @@ function preload() {
 	game.world.setBounds(0, 0, 
 		gameProperties.game_Width, gameProperties.game_Height, 
 		false, false, false, false);
-	game.physics.startSystem(Phaser.Physics.P2JS);
-	game.physics.p2.setBoundsToWorld(false, false, false, false, false);
-	game.physics.p2.gravity.y = 0;
-	game.physics.p2.applyGravity = false;
 };
 
 function create() {
 	game.stage.backgroundColor = 0x000000;
 	socket.on('connect', function() {
+		console.log("connect");
 		createPlayer();
 		gameProperties.in_game = true;
 	});
 	socket.on('player_send', function(spawn) {
+		console.log("player send");
 		spawn_point = spawn;
-		focus = coords.offset_to_pixel(spawn, 
-			gameProperties.hex_size, coords.Point(0, 0));
-		var shift = coords.Point(innerWidth / 2, innerHeight / 2);
-		corner = coords.point_substract(focus, shift);
+		focus = offset_to_pixel(spawn, 
+			gameProperties.hex_size, Point(0, 0));
+		var shift = new Point(innerWidth / 2, innerHeight / 2);
+		corner = point_substract(focus, shift);
 		game.camera.x = focus.px_x;
 		game.camera.y = focus.px_y;
 	});
 	socket.on('map_send', function(pack) {
-		var map = map_gen.distributed_resource_map(pack);
-		var graphics = game.add.graphics(0, 0);
-		//draw map - only hexes and resources
-		var size = (1 << pack.log_size) + 1;
-		for (let i = 0; i < size; ++i)
-			for (let j = 0; j < size; ++j) {
-				let center = coords.offset_to_pixel(
-					{row: i, col: j}, 
-					gameProperties.hex_size, 
-					{px_x: 0, px_y: 0}
-				);
-
-				graphics.beginFill(getColor(map[i + '_' + j]));
-				function getColor(index) {
-					switch(index) {
-						case 0:
-						return 0x000000;
-						case 1:
-						return 0x960018;
-						case 2:
-						return 0x1cd3a2;
-						case 3:
-						return 0x9932cc;
-					}
-				};
-
-    			graphics.lineStyle(1, 0x000000, 1);
-
-				let t = coords.hex_corner(center, gameProperties.hex_size, 5);
-				graphics.moveTo(t.px_x, t.px_y);
-				for (let k = 0; k < 6; ++k) {
-					t = coords.hex_corner(center, gameProperties.hex_size, k);
-					graphics.lineTo(t.px_x, t.px_y);
-				}
-
-				graphics.endFill();
-			}
-
-		window.graphics = graphics;
+		console.log("map send");
+		map = distributed_resource_map(pack);
 	});
 };
 
@@ -97,9 +58,9 @@ var spawn_point, corner, focus;
 
 function request_chunks() {
 	socket.emit('chunks_requested', {
-		topleft: coords.pixel_to_chunk(
+		topleft: pixel_to_chunk(
 			{px_x: 0, px_y: 0}, gameProperties.hex_size, corner),
-		bottomright: coords.pixel_to_chunk(
+		bottomright: pixel_to_chunk(
 			{px_x: innerWidth, px_y: innerHeight},
 			gameProperties.hex_size, corner)
 	});
@@ -108,8 +69,8 @@ function request_chunks() {
 function update() {
 	if (game.input.activePointer.isDown) {	
 		if (game.origDragPoint) {		
-			var old_chunk = coords.pixel_to_chunk(
-				coords.Point(0, 0),
+			var old_chunk = pixel_to_chunk(
+				new Point(0, 0),
 				gameProperties.hex_size, corner, 
 				gameProperties.chunk_params);
 
@@ -119,16 +80,16 @@ function update() {
 			corner.px_x += game.origDragPoint.x - game.input.activePointer.position.x;
 			corner.px_y += game.origDragPoint.y - game.input.activePointer.position.y;
 
-			var new_chunk = coords.pixel_to_chunk(
-				coords.Point(0, 0),
+			var new_chunk = pixel_to_chunk(
+				new Point(0, 0),
 				gameProperties.hex_size, corner, 
 				gameProperties.chunk_params);
 
 			if (old_chunk != new_chunk)
 				socket.emit('chunks_requested', {
 					topleft: new_chunk,
-					bottomright: coords.pixel_to_chunk(
-						coords.Point(innerWidth, innerHeight),
+					bottomright: pixel_to_chunk(
+						new Point(innerWidth, innerHeight),
 						gameProperties.hex_size, corner, 
 						gameProperties.chunk_params)
 				});
@@ -142,10 +103,52 @@ function update() {
 
 var chunks_list = [];
 function render() {
-	var size = chunks_list.length;
-	for (let i = 0; i < size; ++i)
-		draw(chunks_list[i]);
-	chunks_list.slice(size);
+	//var size = chunks_list.length;
+	//for (let i = 0; i < size; ++i)
+	//	draw(chunks_list[i]);
+	//chunks_list.slice(size);
+	drawMap();
+};
+function drawMap() {
+	var graphics = game.add.graphics(0, 0);
+		//draw map - only hexes and resources
+		var start = pixel_to_offset(new Point(0, 0), gameProperties.hex_size, corner),
+			end = pixel_to_offset(new Point(innerWidth, innerHeight), gameProperties.hex_size, corner);
+		for (let i = start.row; i <= end.row; ++i)
+			for (let j = start.col; j <= end.col; ++j) {
+				let center = offset_to_pixel(
+					{row: i, col: j}, 
+					gameProperties.hex_size, 
+					{px_x: 0, px_y: 0}
+				);
+
+				graphics.beginFill(getColor(map[i + '_' + j]));
+				function getColor(index) {
+					switch(index) {
+						case 0:
+						return 0xFFFFFF;
+						case 1:
+						return 0x960018;
+						case 2:
+						return 0x1cd3a2;
+						case 3:
+						return 0x9932cc;
+					}
+				};
+
+    			graphics.lineStyle(1, 0x000000, 1);
+
+				let t = hex_corner(center, gameProperties.hex_size, 5);
+				graphics.moveTo(t.px_x, t.px_y);
+				for (let k = 0; k < 6; ++k) {
+					t = hex_corner(center, gameProperties.hex_size, k);
+					graphics.lineTo(t.px_x, t.px_y);
+				}
+
+				graphics.endFill();
+			}
+
+	window.graphics = graphics;
 };
 function draw(chunk) {
 //TODO: draws only buildings with owner's color
@@ -153,6 +156,7 @@ function draw(chunk) {
 
 socket.on('chunks_received', append_chunks);
 function append_chunks(chunk_table) {
+	console.log("chunks received");
 	chunk_table.forEach(function(item, index, array) {
 		if (!chunks_list.includes(item))
 			chunks_list.push(item);
@@ -161,14 +165,15 @@ function append_chunks(chunk_table) {
 
 socket.on('chunk_updated', append_chunk_if_needed);
 function append_chunk_if_needed(chunk) {
-	if (coords.chunk_inside(
+	console.log("chunk updated");
+	if (chunk_inside(
 		chunk, 
-		coords.pixel_to_chunk(
-			coords.Point(0, 0),
+		pixel_to_chunk(
+			Point(0, 0),
 			gameProperties.hex_size, corner, 
 			gameProperties.chunk_params),
-		coords.pixel_to_chunk(
-			coords.Point(innerWidth, innerHeight),
+		pixel_to_chunk(
+			Point(innerWidth, innerHeight),
 			gameProperties.hex_size, corner, 
 			gameProperties.chunk_params))
 		)

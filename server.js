@@ -21,6 +21,7 @@ var field = [];
 io.sockets.on('connection', function(socket) {
 	console.log("socket connected");
 	socket.on('new_player', function(data) {
+		console.log("new player");
 		var start_new_map = !prepare_spawn();
 		var spawn = next_player();
 		var new_player = new Player(
@@ -31,6 +32,7 @@ io.sockets.on('connection', function(socket) {
 		socket.emit('map_send', next_map(start_new_map));
 	});
 	socket.on('chunks_requested', function(bounds) {
+		console.log("chunks requested");
 		var res_list = [];
 		for (let i = bounds.topleft.x; 
 			i <= bounds.bottomright.x; ++i)
@@ -40,6 +42,7 @@ io.sockets.on('connection', function(socket) {
 		socket.emit('chunks_received', res_list);
 	});
 	socket.on('chunk_updated_send', function(chunk) {
+		console.log("chunk updated send");
 		field[chunk.i + '_' + chunk.j] = chunk;
 		io.emit('chunk_updated', chunk);
 	});
