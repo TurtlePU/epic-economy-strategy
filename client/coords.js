@@ -107,8 +107,8 @@ function offset_to_pixel(offset, size, topleft) {
     return point_substract(new Point(x, y), topleft);
 };
 function pixel_to_cube(pixel, size) {
-    let x = (pixel.x * sqrt3 / 3 - pixel.y / 3) / size,
-        z = y * 2 / 3 / size;
+    let x = (pixel.px_x * sqrt3 / 3 - pixel.px_y / 3) / size,
+        z = pixel.px_y * 2 / 3 / size;
     return new Cube(x, -x - z, z);
 };
 function round_cube(cube) {
@@ -156,4 +156,9 @@ function chunk_inside(chunk, bord1, bord2) {
 		   bord2.x >= chunk.x &&
 		   bord1.y <= chunk.y &&
 		   bord2.y >= chunk.y;
+};
+function chunk_to_offset(chunk, chunk_params) {
+	return new Offset(
+		chunk.x * chunk_params.width, 
+		chunk.y * chunk_params.height);
 };

@@ -1,17 +1,19 @@
-function distributed_resource_map(pack) {
-	var map = resource_map(pack);
-	//maybe we can find better distibution
-	var res = [];
-	var size = (1 << pack.log_size) + 1;
-	var count = 1;
-	for (let i = 0; i < size; ++i)
-		for (let j = 0; j < size; ++j)
-			if (map[i + '_' + j]) {
-				res[i + '_' + j] = count;
-				if (count == 3) count = 1;
-				else ++count;
-			} else res[i + '_' + j] = 0;
-	return res;
+module.exports = {
+	distributed_resource_map: function(pack) {
+		var map = resource_map(pack);
+		//maybe we can find better distibution
+		var res = [];
+		var size = (1 << pack.log_size) + 1;
+		var count = 1;
+		for (let i = 0; i < size; ++i)
+			for (let j = 0; j < size; ++j)
+				if (map[i + '_' + j]) {
+					res[i + '_' + j] = count;
+					if (count == 3) count = 1;
+					else ++count;
+				} else res[i + '_' + j] = 0;
+		return res;
+	}
 };
 
 function resource_map(pack) {
