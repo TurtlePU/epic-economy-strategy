@@ -20,7 +20,7 @@ main.prototype = {
 	preload: preload,
 	create: create,
 	update: update,
-	render: render
+	//render: render
 };
 
 function preload() {
@@ -28,12 +28,18 @@ function preload() {
 	game.world.setBounds(0, 0, 
 		gameProperties.game_Width, gameProperties.game_Height, 
 		false, false, false, false);
+	game.kineticScrolling = game.plugins.add(Phaser.Plugin.KineticScrolling);
+	game.kineticScrolling.configure({
+		horizontalScroll: true,
+		verticalScroll: true
+	});
 };
 
 var map_index;
 
 function create() {
 	game.stage.backgroundColor = 0x000000;
+	game.kineticScrolling.start();
 	socket.on('connect', function() {
 		console.log("connect");
 		createPlayer();
@@ -63,6 +69,7 @@ function request_chunks() {
 			{px_x: innerWidth, px_y: innerHeight},
 			gameProperties.hex_size, corner,
 			gameProperties.chunk_params);
+	console.log(topleft.x + "-" + bottomright.x + "/" + topleft.y + "-" + bottomright.y);
 	socket.emit('chunks_requested', {
 		left: topleft.x,
 		right: bottomright.x,
@@ -72,31 +79,11 @@ function request_chunks() {
 };
 
 function update() {
-	if (game.input.activePointer.isDown) {	
-		if (game.origDragPoint) {		
-			var old_chunk = pixel_to_chunk(
-				new Point(0, 0),
-				gameProperties.hex_size, corner, 
-				gameProperties.chunk_params);
-
-			game.camera.x += game.origDragPoint.x - game.input.activePointer.position.x;		
-			game.camera.y += game.origDragPoint.y - game.input.activePointer.position.y;
-			
-			corner.px_x += game.origDragPoint.x - game.input.activePointer.position.x;
-			corner.px_y += game.origDragPoint.y - game.input.activePointer.position.y;
-
-			var new_chunk = pixel_to_chunk(
-				new Point(0, 0),
-				gameProperties.hex_size, corner, 
-				gameProperties.chunk_params);
-
-			if (old_chunk != new_chunk)
-				request_chunks();
-		}	
-		game.origDragPoint = game.input.activePointer.position.clone();
-	}
-	else {	
-		game.origDragPoint = null;
+	if (game.camera.x != focus.px_x || game.camera.y != focus.px_y) {
+		focus.px_x = game.camera.x;
+		focus.px_y = game.camera.y;
+		corner = point_substract(focus, new Point(innerWidth / 2, innerHeight / 2));
+		request_chunks();
 	}
 };
 
@@ -108,41 +95,45 @@ function render() {
 };
 
 function draw_chunk(graphics, chunk) {
-		for (let i = chunk.x; i < chunk.x + gameProperties.chunk_params.width; ++i)
-			for (let j = chunk.y; j <= chunk.y + gameProperties.chunk_params.height; ++j) {
-				let center = offset_to_pixel(
-					{row: i, col: j}, 
-					gameProperties.hex_size, 
-					{px_x: 0, px_y: 0}
-				);
+	let w = gameProperties.chunk_params.width,
+		h = gameProperties.chunk_params.height,
+		s = gameProperties.hex_size;
+	for (let i = chunk.x * w; i < (chunk.x + 1) * w; ++i)
+		for (let j = chunk.y * h; j < (chunk.y + 1) * h; ++j) {
+			let center = offset_to_pixel(
+				{row: i, col: j}, s, 
+				corner
+			);
 
-				graphics.beginFill(getColor(chunk.res[i + '_' + j]));
-				function getColor(index) {
-					switch(index) {
-						case 0:
-						return 0xFFFFFF;
-						case 1:
-						return 0x960018;
-						case 2:
-						return 0x1cd3a2;
-						case 3:
-						return 0x9932cc;
-					}
-				};
-
-    			graphics.lineStyle(1, 0x000000, 1);
-
-				let t = hex_corner(center, gameProperties.hex_size, 5);
-				graphics.moveTo(t.px_x, t.px_y);
-				for (let k = 0; k < 6; ++k) {
-					t = hex_corner(center, gameProperties.hex_size, k);
-					graphics.lineTo(t.px_x, t.px_y);
+			graphics.beginFill(getColor(chunk.res[i - chunk.x * w][j - chunk.y * h]));
+			function getColor(index) {
+				switch(index) {
+					case 0:
+					return 0xffffff;
+					case 1:
+					return 0x960018;
+					case 2:
+					return 0x1cd3a2;
+					case 3:
+					return 0x9932cc;
 				}
+			};
 
-				graphics.endFill();
+    		graphics.lineStyle(1, 0x000000, 1);
 
-				//add smth with buildings
+    		console.log(center.px_x + " " + center.px_y + " " + chunk.res[i - chunk.x * w][j - chunk.y * h]);
+
+			let t = hex_corner(center, s, 5);
+			graphics.moveTo(t.px_x, t.px_y);
+			for (let k = 0; k < 6; ++k) {
+				t = hex_corner(center, s, k);
+				graphics.lineTo(t.px_x, t.px_y);
 			}
+
+			graphics.endFill();
+
+			//add smth with buildings
+		}
 };
 
 socket.on('chunks_received', draw_chunks);
@@ -150,6 +141,9 @@ function draw_chunks(chunk_table) {
 	console.log("chunks received");
 	var graphics = game.add.graphics(0, 0);
 	chunk_table.forEach(function(item, index, array) {
+		console.log(index + ": ");
+		console.log(JSON.stringify(item));
+		console.log(item.res);
 		draw_chunk(graphics, item);
 	});
 	window.graphics = graphics;

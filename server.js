@@ -35,12 +35,11 @@ io.sockets.on('connection', function(socket) {
 		var res_list = [];
 		for (let i = bounds.left; i <= bounds.right; ++i) {
 			for (let j = bounds.top; j <= bounds.bottom; ++j) {
-				res_list.push(field_list[index].map[i + '_' + j]);
+				if (field_list[index].map[i + '_' + j] != undefined) {
+					res_list.push(field_list[index].map[i + '_' + j]);
+				}
 			}
 		}
-		res_list.forEach(function(elem, i, arr){
-			console.log(elem);
-		});
 		socket.emit('chunks_received', res_list);
 	});
 	socket.on('chunk_updated_send', function(chunk, index) {
@@ -53,6 +52,12 @@ io.sockets.on('connection', function(socket) {
 });
 
 function compress(map, length) {
+	for (let i = 0; i < length; ++i) {
+		let str = "";
+		for (let j = 0; j < length; ++j)
+			str += map[i + '_' + j] + " ";
+		console.log(str);
+	}
 	var chunks = [];
 	let w = 3, h = 3;
 	let arr_w = Math.ceil(length / w), arr_h = Math.ceil(length / h)
@@ -60,14 +65,22 @@ function compress(map, length) {
 		for (let j = 0; j < arr_h; ++j)
 			chunks[i + '_' + j] = {
 				x: i, y: j,
-				res: [],
+				res: [[]],
 				//smth with buildings
 			};
 
 	with(Math) {
-	for (let i = 0; i < length; ++i)
-		for (let j = 0; j < length; ++j) {
-			chunks[floor(i / w) + '_' + floor(j / h)].res[i + '_' + j] = map[i + '_' + j];
+		for (let i = 0; i < length; ++i) {
+			let chunk_i = floor(i / w);
+			let dep_i = i - chunk_i * w;
+			for (let j = 0; j < length; ++j) {
+				let chunk_j = floor(j / h);
+				let dep_j = j - chunk_j * h;
+				if (chunks[chunk_i + '_' + chunk_j].res[dep_i] == undefined) {
+					chunks[chunk_i + '_' + chunk_j].res[dep_i] = [];
+				}
+				chunks[chunk_i + '_' + chunk_j].res[dep_i][dep_j] = map[i + '_' + j];
+			}
 		}
 	}
 	return chunks;
