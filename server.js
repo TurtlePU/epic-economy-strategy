@@ -99,7 +99,7 @@ function next_player() {
 		field_list.push({
 			filled: false,
 			map: [],
-			get_next: function() {return {row: 0, col: 0, i: i};}
+			get_next: function() {return {row: 16, col: 16, i: i};}
 		});
 		var params = next_map();
 		field_list[i].map = compress(map_gen.distributed_resource_map(params), (1 << params.log_size) + 1);
@@ -116,11 +116,11 @@ function next_map() {
 		c: 16,
 		mod: 228,
 		seed: 0,
-		log_size: 2,
+		log_size: 10,
 		height: 100,
 		prob_a: 15, 
 		prob_b: 5,
-		prob_c: -5,
+		prob_c: 869,
 		prob_mod: 100,
 		prob_seed: 80
 	};

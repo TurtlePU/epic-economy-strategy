@@ -1,0 +1,5 @@
+func;in;in_u;time;time_u;cap;cap_u;out;out_u;cost;cost_u
+mine;260;+19;20;-3;0;0;180;+18;"50;50/1000";*2
+mine_u;216;+16;20;-3;0;0;150;+15;;
+rec;;;;;;;;;;
+rec_u;;;;;;;;;;
