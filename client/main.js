@@ -1,94 +1,98 @@
+//socket.io
 const socket = io.connect();
-
-//phaser-dependent
-var gameBootstrapper = {
-	init: function(gameContainerElementId) {
-		game.state.add('main', main);
-		game.state.start('main');
-		socket.emit('new_player', {
-			id: socket.id,
-			//maybe smth else
-		});
-	}
-};
-
-const innerWidth = 0.9 * window.innerWidth,
-	  innerHeight = 0.9 * window.innerHeight;
-//0.95 * Math.max(Math.floor(window.innerHeight / 1080 * 1000), document.documentElement.clientHeight);
-const game = new Phaser.Game(innerWidth, innerHeight,
-	Phaser.AUTO, 'gameDiv');
-var map_index, corner, focus;
-var hex_size, chunk_params = new ChunkParams(3, 3);
-
-var gameProperties = {
-	game_width: 4000,
-	game_height: 4000
-};
 
 socket.on('connect', function() {
 	console.log("connect");
 });
 
-socket.on('player_send', function(spawn) {
-	console.log("player send " + spawn);
-	
-	map_index = spawn.i;
-	
-	//camera
-	focus = offset_to_pixel(spawn, hex_size, new Point(0, 0));
-	var shift = new Point(innerWidth / 2, innerHeight / 2);
-	corner = point_substract(focus, shift);
-	request_chunks();
+//PIXI.js
+const gl = PIXI.autoDetectRenderer(256, 256);
+const stage = new PIXI.Container();
 
-	//phaser-dependent
-	game.camera.x = focus.px_x;
-	game.camera.y = focus.px_y;
+const imagePathList = ["bmp/empty_cell.bmp"];
+
+var gameCycle = {
+	start: start
+};
+
+function start() {
+	sayHello();
+
+	resizeRenderer();
+	document.body.appendChild(gl.view);
+	
+	socket.emit('new_player', {
+		id: socket.id,
+		//maybe smth else
+	});
+	
+	PIXI.loader.add(imagePathList).load(fillRootContainer);
+	gl.render(stage);
+};
+//start subordinates
+function sayHello() {
+	var type = "WebGL";
+	if (!PIXI.utils.isWebGLSupported()) {
+		type = canvas;
+	}
+	PIXI.utils.sayHello(type);
+};
+
+function resizeRenderer() {
+	gl.view.style.position = "absolute";
+	gl.view.style.display = "block";
+	gl.autoResize = true;
+	gl.resize(window.innerWidth, window.innerHeight);
+};
+
+var cellSideSizeInPixels;
+
+function fillRootContainer() {
+	imagePathList.forEach(function(item, index, array) {
+		let sprite = new PIXI.Sprite(
+			PIXI.loader.resources[item].texture
+		);
+		//put inside stage
+		stage.addChild(sprite);
+	});
+	//set cellSideSize
+};
+//end of start subordinates
+
+//map index should be stored at server
+var mapOfChunks = [];
+var mapSizeInCells;
+
+var chunkWidthInCells, chunkHeightInCells;
+var homeCell;
+var boundsOnMapInPixels;
+//add socket.emit on server side
+socket.on('gameDataSend', function(gameData) {
+	console.log("game data send");
+
+	mapSizeInCells = (1 << gameData.logSize) + 1;
+	chunkWidthInCells = gameData.chunkWidth;
+	chunkHeightInCells = gameData.chunkHeight;
+	
+	//Wrap map gen in object, move here
+	mapOfChunks = MapGen.buildChunked(gameData);
+	homeCell = gameData.homeCell;
+
+	//Move camera to homeCell
+	buildBounds();
+});
+//gameDataSend subordinates
+function buildBounds() {
+	//make camera coordinates right
+}
+//end of GameDataSend subordinates
+
+socket.on('chunkUpdated', function(chunk) {
+	console.log("chunk updated");
+	//push chunk to map
 });
 
-function request_chunks() {
-	let topleft = pixel_to_chunk(
-			{px_x: 0, px_y: 0}, 
-			hex_size, corner, chunk_params),
-		bottomright = pixel_to_chunk(
-			{px_x: innerWidth, px_y: innerHeight},
-			hex_size, corner, chunk_params);
-	console.log(topleft.x + "-" + bottomright.x + "/" + topleft.y + "-" + bottomright.y + " at map_index " + map_index);
-	socket.emit('chunks_requested', {
-		left: topleft.x,
-		right: bottomright.x,
-		top: topleft.y,
-		bottom: bottomright.y
-	}, map_index);
-};
-
-
-socket.on('chunks_received', draw_chunks);
-function draw_chunks(chunk_table) {
-	console.log("chunks received");
-	chunk_table.forEach(function(item, index, array) {
-		draw_chunk(item);
-	});
-};
-
-socket.on('chunk_updated', append_chunk_if_needed);
-function append_chunk_if_needed(chunk) {
-	console.log("chunk updated");
-	if (chunk_inside(
-		chunk, 
-		pixel_to_chunk(
-			new Point(0, 0),
-			hex_size, corner, chunk_params),
-		pixel_to_chunk(
-			new Point(innerWidth, innerHeight),
-			hex_size, corner, chunk_params)
-		)
-	) {
-		//phaser-dependent
-		var graphics = game.add.graphics(0, 0);
-		draw_chunk(graphics, chunk);
-		window.graphics = graphics;
-	}
-};
+//THIS IS AS FAR AS I GO
 
 //phaser-dependent
 function draw_chunk(
