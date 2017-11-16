@@ -1,141 +1,144 @@
-Cube = function (tx, ty, tz) {
-    this.x = tx;
-    this.y = ty;
-    this.z = tz
+function Offset(row, col) {
+    this.toCube = function() {
+        let x = col - (row >> 1),
+            z = row;
+        return new Cube(x, z, - x - z);
+    };
+    const sqrt3 = Math.sqrt(3);
+    this.toPoint = function(size) {
+        var x = size * sqrt3 * (col + 0.5 * (row & 1)),
+            y = size * 3 / 2 * row;
+        return new Point(x, y);
+    };
+
+    this.getNeighbor = function(direction) {
+        return this.toCube().getNeighbor(direction).toOffset();
+    };
+    this.getDiagonalNeighbor = function(direction) {
+        return this.toCube().getDiagonalNeighbor(direction).toOffset();
+    };
+
+    this.dist = function(offset) {
+        return this.toCube().dist(offset.toCube());
+    }
+    this.reaches = function(radius) {
+        var result = [], t = this.toCube.reaches(radius);
+        t.forEach(function(item, index, array) {
+            result.push(t.toOffset());
+        });
+        return result;
+    }
 };
 
-Offset = function (trow, tcol) {
-    this.row = trow;
-    this.col = tcol;
+function Cube(x, y, z) {
+    this.getX = function() {return x;};
+    this.getY = function() {return y;};
+    this.getZ = function() {return z;};
+
+    this.toOffset = function() {
+        return new Offset(z, x + (z >> 1));    
+    };
+
+    this.round = function() {
+        with (Math) {
+            var rx = round(x),
+                ry = round(y),
+                rz = round(z),
+
+                dx = abs(rx - x),
+                dy = abs(ry - y),
+                dz = abs(rz - z);
+        }
+        
+        if (dx >= dy && dx >= dz) 
+            rx = -ry - rz;
+        else if (dy >= dz) 
+            ry = -rx - rz;
+        else 
+            rz = -rx - ry;
+        
+        return new Cube(rx, ry, rz);
+    };
+
+    function add(cube) {
+        return new Cube(x + cube.getX(), y + cube.getY(), z + cube.getZ());
+    }.bind(this);
+
+    this.dist = function(cube) {
+        with (Math) {
+            return (abs(x - cube.getX()) + abs(y - cube.getY()) + abs(z - cube.getZ())) / 2;
+        }
+    };
+
+    var directions = [
+        new Cube(+1, -1, 0), new Cube(+1, 0, -1), new Cube(0, +1, -1),
+        new Cube(-1, +1, 0), new Cube(-1, 0, +1), new Cube(0, -1, +1)
+    ];
+    this.getNeighbor = function(direction) {
+        return add(directions[direction]);
+    };
+
+    var diagonals = [
+        new Cube(+2, -1, -1), new Cube(+1, +1, -2), new Cube(-1, +2, -1), 
+        new Cube(-2, +1, +1), new Cube(-1, -1, +2), new Cube(+1, -2, +1)
+    ];
+    this.getDiagonalNeighbor = function(direction) {
+        return add(diagonals[direction]);
+    };
+
+    this.reaches = function(radius) {
+        var result = [];
+        for (let tx = x - r; tx <= x + r; ++tx)
+            for (let ty = y - r; ty <= y + r; ++ty)
+                result.push(new Cube(tx, ty, -tx - ty));
+        return result;
+    };
 };
 
-Point = function (tx, ty) {
-    this.px_x = tx;
-    this.px_y = ty;
+function Point(x, y, hexSize) {
+    this.getX = function() {return x;};
+    this.getY = function() {return y;};
+
+    const sqrt3 = Math.sqrt(3);
+    function toUnRoundCube() {
+        let tx = (x * sqrt3 - y) / (3 * hexSize),
+            tz = (y * 2) / (3 * hexSize);
+        return new Cube(tx, -tx - tz, tz);
+    }.bind(this);
+    this.toCube = function() {
+        return toUnRoundCube().round();
+    };
+
+    this.toOffset = function() {
+        return toCube().toOffset();
+    };
+
+    this.add = function(point) {
+        return new Point(x + point.getX(), y + point.getY(), hexSize);
+    };
+    this.sub = function(point) {
+        return new Point(x - point.getX(), y - point.getY(), hexSize);
+    };
+
+    this.getCorner = function(direction) {
+        with (Math) {
+            var angle = PI * direction / 3 + PI / 6;
+            return new Point(x + hexSize * cos(angle), y + hexSize * sin(angle));
+        }
+    };
 };
 
-Chunk = function(tx, ty) {
-	this.x = tx;
-	this.y = ty;
-}
+function Chunk(x, y) {
+	
+};
 
 ChunkParams = function (tx, ty) {
 	this.width = tx;
 	this.height = ty;
 };
 
-function hex_corner(center, size, i) {
-    with (Math) {
-        var angle = PI * i / 3 + PI / 6;
-        return new Point(center.px_x + size * cos(angle), center.px_y + size * sin(angle));
-    }
-};
-
-//odd-r
-function offset_coords(cube) {
-    return new Offset(cube.z, cube.x + (cube.z - (cube.z & 1)) / 2);
-};
-
-function cube_coords(offset) {
-    let row = offset.row,
-        col = offset.col,
-        x = col - (row - (row & 1)) / 2,
-        z = row;
-    return new Cube(x, z, - x - z);
-};
-
-var directions = [
-   new Cube(+1, -1, 0), new Cube(+1, 0, -1), new Cube(0, +1, -1),
-   new Cube(-1, +1, 0), new Cube(-1, 0, +1), new Cube(0, -1, +1)
-];
-
-function cube_neighbor(hex, direction) {
-    return cube_add(hex, directions[direction]);
-};
-function offset_neighbor(offset, direction) {
-    return offset_coords(cube_neighbor(cube_coords(offset), direction));
-};
-
-var diagonals = [
-   new Cube(+2, -1, -1), new Cube(+1, +1, -2), new Cube(-1, +2, -1), 
-   new Cube(-2, +1, +1), new Cube(-1, -1, +2), new Cube(+1, -2, +1)
-];
-
-function cube_diagonal_neighbor(hex, direction) {
-    return cube_add(hex, diagonals[direction])
-};
-function offset_diagonal_neighbor(offset, direction) {
-    return offset_coords(cube_diagonal_neighbor(cube_coords(offset), direction));
-};
-
-function cube_add(a, b) {
-    return new Cube(a.x + b.x, a.y + b.y, a.z + b.z);
-};
-
-function cube_distance(a, b) {
-    with (Math) {
-        return (abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z)) / 2;
-    }
-};
-function offset_distance(a, b) {
-    let cube_a = cube_coords(a),
-        cube_b = cube_coords(b);
-    return cube_distance(cube_a, cube_b);
-};
-
-function cube_reaches(cube, r) {
-    var result = [];
-    for (let x = cube.x - r; x <= cube.x + r; ++x)
-        for (let y = cube.y - r; y <= cube.y + r; ++y)
-            result.push(Cube(x, y, -x - y));
-    return result;
-};
-function offset_reaches(offset, r) {
-    let t = cube_reaches(cube_coords(offset), r);
-    var result = [];
-    t.forEach(function (cube) {
-        result.push(offset_coords(cube));
-    });
-    return result;
-};
-
 //(0, 0) in the center of hex[0][0]
 const sqrt3 = Math.sqrt(3);
-function offset_to_pixel(offset, size, topleft) {
-    var x = size * sqrt3 * (offset.col + 0.5 * (offset.row & 1)),
-        y = size * 3 / 2 * offset.row;
-    return point_substract(new Point(x, y), topleft);
-};
-function pixel_to_cube(pixel, size) {
-    let x = (pixel.px_x * sqrt3 / 3 - pixel.px_y / 3) / size,
-        z = pixel.px_y * 2 / 3 / size;
-    return new Cube(x, -x - z, z);
-};
-function round_cube(cube) {
-    with (Math) {
-        var rx = round(cube.x),
-            ry = round(cube.y),
-            rz = round(cube.z),
-
-            dx = abs(rx - cube.x),
-            dy = abs(ry - cube.y),
-            dz = abs(rz - cube.z);
-    }
-    if (dx >= dy && dx >= dz) rx = -ry - rz;
-    else if (dy >= dz) ry = -rx - rz;
-    else rz = -rx - ry;
-    return new Cube(rx, ry, rz);
-};
-function pixel_to_offset(pixel, size, topleft) {
-    return offset_coords(round_cube(pixel_to_cube(point_add(pixel, topleft), size)));
-};
-
-function point_substract(a, b) {
-	return new Point(a.px_x - b.px_x, a.px_y - b.px_y);
-};
-function point_add(a, b) {
-	return new Point(a.px_x + b.px_x, a.px_y + b.px_y);
-};
 
 function offset_to_chunk(offset, chunk_params) {
 	with (Math) {
