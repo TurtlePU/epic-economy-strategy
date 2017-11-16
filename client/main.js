@@ -8,8 +8,16 @@ socket.on('connect', function() {
 //PIXI.js
 const gl = PIXI.autoDetectRenderer(256, 256);
 const stage = new PIXI.Container();
+function texture(path) {
+	return PIXI.loader.resources[path].texture;
+};
 
-const imagePathList = ["bmp/empty_cell.bmp"];
+const imagePathList = [
+	"bmp/cell_color0.bmp", 
+	"bmp/cell_color1.bmp", 
+	"bmp/cell_color2.bmp", 
+	"bmp/cell_color3.bmp"
+];
 
 var gameCycle = {
 	start: start
@@ -21,12 +29,11 @@ function start() {
 	resizeRenderer();
 	document.body.appendChild(gl.view);
 	
-	socket.emit('new_player', {
-		id: socket.id,
-		//maybe smth else
-	});
-	
-	PIXI.loader.add(imagePathList).load(fillRootContainer);
+	PIXI.loader
+		.add(imagePathList)
+		.on("progress", showProgress)
+		.load(emitPlayer);
+
 	gl.render(stage);
 };
 //start subordinates
@@ -45,51 +52,109 @@ function resizeRenderer() {
 	gl.resize(window.innerWidth, window.innerHeight);
 };
 
-var cellSideSizeInPixels;
+function showProgress(loader, resource) {
+	console.log("loading...");
+	//TODO: Progress bar
+	//loader.progress - progress in %
+};
 
+function emitPlayer() {
+	socket.emit('new_player', {
+		id: socket.id,
+		//maybe smth else
+	});
+};
+
+//TODO: set cellSideSize
+var cellSideSizeInPixels;
+//I don't know whether I need it
 function fillRootContainer() {
 	imagePathList.forEach(function(item, index, array) {
-		let sprite = new PIXI.Sprite(
-			PIXI.loader.resources[item].texture
-		);
+		let sprite = new PIXI.Sprite(texture(item));
 		//put inside stage
 		stage.addChild(sprite);
 	});
-	//set cellSideSize
 };
 //end of start subordinates
 
-//map index should be stored at server
+//TODO: map index should be stored at server
 var mapOfChunks = [];
-var mapSizeInCells;
+var chunkContainers = [];
+var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
 
 var chunkWidthInCells, chunkHeightInCells;
 var homeCell;
 var boundsOnMapInPixels;
-//add socket.emit on server side
+//TODO: add socket.emit on server side
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
-
-	mapSizeInCells = (1 << gameData.logSize) + 1;
-	chunkWidthInCells = gameData.chunkWidth;
-	chunkHeightInCells = gameData.chunkHeight;
-	
-	//Wrap map gen in object, move here
-	mapOfChunks = MapGen.buildChunked(gameData);
-	homeCell = gameData.homeCell;
-
+	fillVarFromData(gameData);
+	fillSpriteArray();
 	//Move camera to homeCell
 	buildBounds();
 });
 //gameDataSend subordinates
+function fillVarFromData(gameData) {
+	mapSizeInCells = (1 << gameData.logSize) + 1;
+	chunkWidthInCells = gameData.chunkWidth;
+	chunkHeightInCells = gameData.chunkHeight;
+
+	mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
+	mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
+
+	mapOfChunks = MapGen.buildChunked(gameData);
+	homeCell = gameData.homeCell;
+};
+
+function fillSpriteArray() {
+	for (let i = 0; i < mapWidthInChunks; ++i) {
+		chunkContainers[i] = [];
+		for (let j = 0; j < mapHeightInChunks; ++j) {
+			fillSpriteContainer(i, j);
+		}
+	}
+};
+
+function fillSpriteContainer(i, j) {
+	if (chunkContainers[i][j] != undefined)
+		stage.removeChild(chunkContainers[i][j]);
+	chunkContainers[i][j] = new PIXI.Container();
+	for (let x = 0; x < chunkWidthInCells; ++x) {
+		for (let y = 0; y < chunkHeightInCells; ++y) {
+			//TODO: set coords of sprites
+			var cellSprites = getSpritesOfCell(i, j, x, y);
+			chunkContainers[i][j].addChild(cellSprites[0], cellSprites[1]);
+		}
+	}
+	//TODO: set coords of chunk container
+	stage.addChild(chunkContainers[i][j]);
+};
+
+function getSpritesOfCell(i, j, x, y) {
+	var strs = getPathsOfCellImage(i, j, x, y);
+	var arr = [];
+	strs.forEach(function(item, index, array) {
+		arr.add(new PIXI.Sprite(texture(item)));
+	});
+	return arr;
+};
+
+function getPathsOfCellImage(i, j, x, y) {
+	return [
+		"bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".bmp",
+		"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".bmp"
+	];
+};
+
 function buildBounds() {
-	//make camera coordinates right
-}
+	//TODO: make camera coordinates right
+};
 //end of GameDataSend subordinates
 
 socket.on('chunkUpdated', function(chunk) {
 	console.log("chunk updated");
-	//push chunk to map
+	mapOfChunks[chunk.x][chunk.y] = chunk;
+	fillSpriteContainer(chunk.x, chunk.y);
 });
 
 //THIS IS AS FAR AS I GO
