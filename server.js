@@ -52,12 +52,6 @@ io.sockets.on('connection', function(socket) {
 });
 
 function compress(map, length) {
-//	for (let i = 0; i < length; ++i) {
-//		let str = "";
-//		for (let j = 0; j < length; ++j)
-//			str += map[i + '_' + j] + " ";
-//		console.log(str);
-//	}
 	var chunks = [];
 	let w = 3, h = 3;
 	let arr_w = Math.ceil(length / w), arr_h = Math.ceil(length / h)

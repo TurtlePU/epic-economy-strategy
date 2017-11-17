@@ -1,167 +1,173 @@
-function Offset(row, col) {
-    this.toCube = function() {
-        let x = col - (row >> 1),
-            z = row;
-        return new Cube(x, z, - x - z);
-    };
+function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
+    //(0, 0) in the center of topleft cell
     const sqrt3 = Math.sqrt(3);
-    this.toPoint = function(size) {
-        var x = size * sqrt3 * (col + 0.5 * (row & 1)),
-            y = size * 3 / 2 * row;
-        return new Point(x, y);
+    const CE = this;
+
+    this.Offset = function(row, col) {
+        console.log(`${row} ${col}`);
+
+        this.getRow = function() {return row;};
+        this.getCol = function() {return col;};
+
+        this.toCube = function() {
+            let x = col - (row - (row & 1)) / 2,
+                z = row;
+            return new Cube(x, - x - z, z);
+        };
+        this.toPoint = function() {
+            var x = hexSize * sqrt3 * (col + 0.5 * (row & 1)),
+                y = hexSize * 3 / 2 * row;
+            return new CE.Point(x, y);
+        };
+        this.toChunk = function() {
+            with(Math) {
+                return new CE.Chunk(floor(col / chunkWidth), floor(row / chunkHeight));
+            }
+        };
+
+        var add = function(offset) {
+            return new CE.Offset(row + offset.getRow(), col + offset.getCol());
+        }.bind(this);
+
+        this.getNeighbor = function(direction) {
+            return this.toCube().getNeighbor(direction).toOffset();
+        };
+        this.getDiagonalNeighbor = function(direction) {
+            return this.toCube().getDiagonalNeighbor(direction).toOffset();
+        };
+
+        this.dist = function(offset) {
+            return this.toCube().dist(offset.toCube());
+        };
+        this.reaches = function(radius) {
+            var result = [], t = this.toCube().reaches(radius);
+            t.forEach(function(item, index, array) {
+                result.push(t.toOffset());
+            });
+            return result;
+        };
     };
 
-    this.getNeighbor = function(direction) {
-        return this.toCube().getNeighbor(direction).toOffset();
+    function Cube(x, y, z) {
+        this.getX = function() {return x;};
+        this.getY = function() {return y;};
+        this.getZ = function() {return z;};
+
+        this.toOffset = function() {
+            return new CE.Offset(z, x + (z - (z & 1)) / 2);    
+        };
+
+        this.round = function() {
+            with (Math) {
+                var rx = round(x),
+                    ry = round(y),
+                    rz = round(z),
+
+                    dx = abs(rx - x),
+                    dy = abs(ry - y),
+                    dz = abs(rz - z);
+            }
+            
+            if (dx >= dy && dx >= dz) 
+                rx = -ry - rz;
+            else if (dy >= dz) 
+                ry = -rx - rz;
+            else 
+                rz = -rx - ry;
+            
+            return new Cube(rx, ry, rz);
+        };
+
+        var add = function(cube) {
+            return new Cube(x + cube.getX(), y + cube.getY(), z + cube.getZ());
+        }.bind(this);
+
+        this.dist = function(cube) {
+            with (Math) {
+                return max(abs(x - cube.getX()), abs(y - cube.getY()), abs(z - cube.getZ()));
+            }
+        };
+
+        this.getNeighbor = function(direction) {
+            return add(directions[direction]);
+        };
+
+        this.getDiagonalNeighbor = function(direction) {
+            return add(diagonals[direction]);
+        };
+
+        this.reaches = function(radius) {
+            var result = [];
+            for (let tx = x - r; tx <= x + r; ++tx)
+                for (let ty = y - r; ty <= y + r; ++ty)
+                    result.push(new Cube(tx, ty, -tx - ty));
+            return result;
+        };
     };
-    this.getDiagonalNeighbor = function(direction) {
-        return this.toCube().getDiagonalNeighbor(direction).toOffset();
-    };
 
-    this.dist = function(offset) {
-        return this.toCube().dist(offset.toCube());
-    }
-    this.reaches = function(radius) {
-        var result = [], t = this.toCube.reaches(radius);
-        t.forEach(function(item, index, array) {
-            result.push(t.toOffset());
-        });
-        return result;
-    }
-};
+    this.Point = function(x, y) {
+        this.getX = function() {return x;};
+        this.getY = function() {return y;};
 
-function Cube(x, y, z) {
-    this.getX = function() {return x;};
-    this.getY = function() {return y;};
-    this.getZ = function() {return z;};
+        var toUnRoundCube = function() {
+            let tx = (x * sqrt3 - y) / (3 * hexSize),
+                tz = (y * 2) / (3 * hexSize);
+            return new Cube(tx, -tx - tz, tz);
+        }.bind(this);
+        this.toCube = function() {
+            return toUnRoundCube().round();
+        };
 
-    this.toOffset = function() {
-        return new Offset(z, x + (z >> 1));    
-    };
+        this.toOffset = function() {
+            return this.toCube().toOffset();
+        };
 
-    this.round = function() {
-        with (Math) {
-            var rx = round(x),
-                ry = round(y),
-                rz = round(z),
+        this.toChunk = function() {
+            return this.toOffset().toChunk();
+        };
 
-                dx = abs(rx - x),
-                dy = abs(ry - y),
-                dz = abs(rz - z);
+        this.add = function(point) {
+            return new CE.Point(x + point.getX(), y + point.getY());
+        };
+        this.sub = function(point) {
+            return new CE.Point(x - point.getX(), y - point.getY());
+        };
+        this.mid = function(point) {
+            return new CE.Point((x + point.getX()) / 2, (y + point.getY()) / 2);
         }
-        
-        if (dx >= dy && dx >= dz) 
-            rx = -ry - rz;
-        else if (dy >= dz) 
-            ry = -rx - rz;
-        else 
-            rz = -rx - ry;
-        
-        return new Cube(rx, ry, rz);
+
+        this.getCorner = function(direction) {
+            with (Math) {
+                var angle = PI * direction / 3 + PI / 6;
+                return new CE.Point(x + hexSize * cos(angle), y + hexSize * sin(angle));
+            }
+        };
     };
 
-    function add(cube) {
-        return new Cube(x + cube.getX(), y + cube.getY(), z + cube.getZ());
-    }.bind(this);
+    this.Chunk = function(x, y) {
+        this.getX = function() {return x;};
+        this.getY = function() {return y;};
 
-    this.dist = function(cube) {
-        with (Math) {
-            return (abs(x - cube.getX()) + abs(y - cube.getY()) + abs(z - cube.getZ())) / 2;
-        }
+        this.inside = function(bord1, bord2) {
+            return 
+                (x - bord1.getX()) * (x - bord2.getX()) <= 0
+                && (y - bord1.getY()) * (y - bord2.getY()) <= 0;
+        };
+
+        this.toOffset = function() {
+            return new CE.Offset(
+                x * chunkWidth,
+                y * chunkHeight);
+        }; 
     };
 
-    var directions = [
+    const directions = [
         new Cube(+1, -1, 0), new Cube(+1, 0, -1), new Cube(0, +1, -1),
         new Cube(-1, +1, 0), new Cube(-1, 0, +1), new Cube(0, -1, +1)
     ];
-    this.getNeighbor = function(direction) {
-        return add(directions[direction]);
-    };
 
-    var diagonals = [
+    const diagonals = [
         new Cube(+2, -1, -1), new Cube(+1, +1, -2), new Cube(-1, +2, -1), 
         new Cube(-2, +1, +1), new Cube(-1, -1, +2), new Cube(+1, -2, +1)
     ];
-    this.getDiagonalNeighbor = function(direction) {
-        return add(diagonals[direction]);
-    };
-
-    this.reaches = function(radius) {
-        var result = [];
-        for (let tx = x - r; tx <= x + r; ++tx)
-            for (let ty = y - r; ty <= y + r; ++ty)
-                result.push(new Cube(tx, ty, -tx - ty));
-        return result;
-    };
-};
-
-function Point(x, y, hexSize) {
-    this.getX = function() {return x;};
-    this.getY = function() {return y;};
-
-    const sqrt3 = Math.sqrt(3);
-    function toUnRoundCube() {
-        let tx = (x * sqrt3 - y) / (3 * hexSize),
-            tz = (y * 2) / (3 * hexSize);
-        return new Cube(tx, -tx - tz, tz);
-    }.bind(this);
-    this.toCube = function() {
-        return toUnRoundCube().round();
-    };
-
-    this.toOffset = function() {
-        return toCube().toOffset();
-    };
-
-    this.add = function(point) {
-        return new Point(x + point.getX(), y + point.getY(), hexSize);
-    };
-    this.sub = function(point) {
-        return new Point(x - point.getX(), y - point.getY(), hexSize);
-    };
-
-    this.getCorner = function(direction) {
-        with (Math) {
-            var angle = PI * direction / 3 + PI / 6;
-            return new Point(x + hexSize * cos(angle), y + hexSize * sin(angle));
-        }
-    };
-};
-
-function Chunk(x, y) {
-	
-};
-
-ChunkParams = function (tx, ty) {
-	this.width = tx;
-	this.height = ty;
-};
-
-//(0, 0) in the center of hex[0][0]
-const sqrt3 = Math.sqrt(3);
-
-function offset_to_chunk(offset, chunk_params) {
-	with (Math) {
-		return new Chunk(
-			floor(offset.col / chunk_params.width),
-			floor(offset.row / chunk_params.height)
-		);
-	}
-};
-function pixel_to_chunk(pixel, size, topleft, chunk_params) {
-	return offset_to_chunk(
-		pixel_to_offset(pixel, size, topleft), 
-		chunk_params
-	);
-};
-function chunk_inside(chunk, bord1, bord2) {
-	return bord1.x <= chunk.x &&
-		   bord2.x >= chunk.x &&
-		   bord1.y <= chunk.y &&
-		   bord2.y >= chunk.y;
-};
-function chunk_to_offset(chunk, chunk_params) {
-	return new Offset(
-		chunk.x * chunk_params.width, 
-		chunk.y * chunk_params.height);
 };

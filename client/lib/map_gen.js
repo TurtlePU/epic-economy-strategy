@@ -21,34 +21,58 @@ class PseudoRandom {
 
 var MapGen = {
 	buildChunked: function(data) {
+		//rewrite a little
+		var chunks = [];
+		let size = (1 << data.logSize) + 1;
+		for (let i = 0; i < size; ++i)
+			chunks[i] = [];
 
+		let arr_w = Math.ceil(size / chunkWidth), arr_h = Math.ceil(size / chunkHeight);
+		for (let i = 0; i < arr_w; ++i)
+			for (let j = 0; j < arr_h; ++j)
+				chunks[i][j] = {
+					x: i, y: j,
+					res: [[]],
+					//smth with buildings
+				};
+
+		with(Math) {
+			for (let i = 0; i < length; ++i) {
+				let chunk_i = floor(i / w);
+				let dep_i = i - chunk_i * w;
+				for (let j = 0; j < length; ++j) {
+					let chunk_j = floor(j / h);
+					let dep_j = j - chunk_j * h;
+					if (chunks[chunk_i + '_' + chunk_j].res[dep_i] == undefined) {
+						chunks[chunk_i + '_' + chunk_j].res[dep_i] = [];
+					}
+					chunks[chunk_i + '_' + chunk_j].res[dep_i][dep_j] = map[i + '_' + j];
+				}
+			}
+		}
+		return chunks;
 	},
 	__distributed_resource_map: function(pack) {
 		var map = this.__resource_map(pack);
 		//maybe we can find better distibution
-		var res = [];
 		var size = (1 << pack.log_size) + 1;
 		var count = 1;
 		for (let i = 0; i < size; ++i) {
 			for (let j = 0; j < size; ++j) {
-				if (map[i + '_' + j]) {
-					res[i + '_' + j] = count;
+				if (map[i][j]) {
+					map[i][j] = count;
 					if (count == 3) 
 						count = 1;
 					else 
 						++count;
-				} else { 
-					res[i + '_' + j] = 0;
 				}
 			}
 		}
-		return res;
+		return map;
 	},
 	__resource_map: function(pack) {
 		var map = this.diamondSquare(pack.a, pack.b, pack.c,
-			pack.mod, pack.seed, pack.log_size, pack.height);
-
-		var res = [];
+			pack.mod, pack.seed, pack.logSize, pack.height);
 		var gen = new PseudoRandom(pack.prob_a, pack.prob_b, pack.prob_c, 
 			pack.prob_mod, pack.prob_seed);
 
@@ -69,12 +93,12 @@ var MapGen = {
 			return 0.84;
 		};
 
-		var size = (1 << pack.log_size) + 1;
+		var size = (1 << pack.logSize) + 1;
 		for (let i = 0; i < size; ++i)
 			for (let j = 0; j < size; ++j)
-				res[i + '_' + j] = 
-					(gen.getNext() < getProb(map[i + '_' + j]));
-		return res;
+				map[i][j] = 
+					(gen.getNext() < getProb(map[i][j]));
+		return map;
 	},
 	diamondSquare: function(a, b, c, mod, seed, log_size, height) {
 		var gen = new PseudoRandom(a, b, c, mod, seed);
@@ -119,13 +143,13 @@ var MapGen = {
 
 			if (mi == i1 || mj == j1) return;
 
-			map[mi + '_' + mj] = getMiddle(i1, j1, i2, j2, dep);
+			map[mi][mj] = getMiddle(i1, j1, i2, j2, dep);
 
-			map[mi + '_' + j1] = getSide(i1, j1, i2, j1, mi, mj, dep);
-			map[mi + '_' + j2] = getSide(i1, j2, i2, j2, mi, mj, dep);
+			map[mi][j1] = getSide(i1, j1, i2, j1, mi, mj, dep);
+			map[mi][j2] = getSide(i1, j2, i2, j2, mi, mj, dep);
 
-			map[i1 + '_' + mj] = getSide(i1, j1, i1, j2, mi, mj, dep);
-			map[i2 + '_' + mj] = getSide(i2, j1, i2, j2, mi, mj, dep);
+			map[i1][mj] = getSide(i1, j1, i1, j2, mi, mj, dep);
+			map[i2][mj] = getSide(i2, j1, i2, j2, mi, mj, dep);
 
 			square(dep + 1, i1, j1, mi, mj);
 			square(dep + 1, i1, mj, mi, j2);

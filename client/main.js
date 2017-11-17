@@ -58,21 +58,13 @@ function showProgress(loader, resource) {
 	//loader.progress - progress in %
 };
 
+var cellSideSizeInPixels;
+
 function emitPlayer() {
+	cellSideSizeInPixels = new PIXI.Sprite(texture("bmp/cell_color0.bmp")).height / 2;
 	socket.emit('new_player', {
 		id: socket.id,
 		//maybe smth else
-	});
-};
-
-//TODO: set cellSideSize
-var cellSideSizeInPixels;
-//I don't know whether I need it
-function fillRootContainer() {
-	imagePathList.forEach(function(item, index, array) {
-		let sprite = new PIXI.Sprite(texture(item));
-		//put inside stage
-		stage.addChild(sprite);
 	});
 };
 //end of start subordinates
@@ -82,9 +74,11 @@ var mapOfChunks = [];
 var chunkContainers = [];
 var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
 
+var CE;
+
 var chunkWidthInCells, chunkHeightInCells;
 var homeCell;
-var boundsOnMapInPixels;
+var boundsOnMapInPixels, focus;
 //TODO: add socket.emit on server side
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
@@ -102,8 +96,21 @@ function fillVarFromData(gameData) {
 	mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
 	mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
 
+	CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
+
 	mapOfChunks = MapGen.buildChunked(gameData);
-	homeCell = gameData.homeCell;
+	homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
+
+	focus = homeCell.toPoint();
+	let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+	boundsOnMapInPixels = {
+		topLeft: focus.sub(d),
+		botRigt: focus.add(d),
+		pushFocus: function() {
+			topLeft = focus.sub(d);
+			botRigt = focus.add(d);
+		}
+	}
 };
 
 function fillSpriteArray() {
@@ -145,10 +152,6 @@ function getPathsOfCellImage(i, j, x, y) {
 		"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".bmp"
 	];
 };
-
-function buildBounds() {
-	//TODO: make camera coordinates right
-};
 //end of GameDataSend subordinates
 
 socket.on('chunkUpdated', function(chunk) {
@@ -157,28 +160,79 @@ socket.on('chunkUpdated', function(chunk) {
 	fillSpriteContainer(chunk.x, chunk.y);
 });
 
+//TODO: Event handling
+
+var lastBounds;
+
+function updRenderingBounds() {
+	let bounds = getRenderingBounds();
+	let x1 = lastBounds.x1,
+		x2 = lastBounds.x2,
+		y1 = lastBounds.y1,
+		y2 = lastBounds.y2,
+
+		tx1 = bounds.x1,
+		tx2 = bounds.x2,
+		ty1 = bounds.y1,
+		ty2 = bounds.y2;
+
+	with(Math) {
+		setChunksVisible(x1, min(x2, tx1 - 1), y1, min(y2, ty1 - 1), false);
+		setChunksVisible(max(x1, tx1), min(x2, tx2), y1, min(y2, ty1 - 1), false);
+		setChunksVisible(max(x1, tx2 + 1), x2, y1, min(y2, ty1 - 1), false);
+		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty1), min(y2, ty2), false);
+		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty1), min(y2, ty2), false);
+		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty2 + 1), y2, false);
+		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty2 + 1), y2, false);
+		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty2 + 1), y2, false);
+
+		setChunksVisible(tx1, min(tx2, x1 - 1), ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(max(tx1, x1), min(tx2, x2), ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y1), min(ty2, y2), true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y1), min(ty2, y2), true);
+		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y2 + 1), ty2, true);
+		setChunksVisible(max(tx1, x1), min(tx2, x2), max(ty1, y2 + 1), ty2, true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
+	}
+
+	lastBounds = bounds;
+};
+
+function getRenderingBounds() {
+	let tl = boundsOnMapInPixels.topLeft.toChunk(),
+		br = boundsOnMapInPixels.botRigt.toChunk();
+	return {x1: tl.getX(), x2: br.getX(), y1: tl.getY(), y2: br.getY()};
+};
+
+function setChunksVisible(x1, y1, x2, y2, value) {
+	for (let x = x1; x <= x2; ++x)
+		for (let y = y1; y <= y2; ++y)
+			chunkContainers[y][x].visible = value;
+};
+
 //THIS IS AS FAR AS I GO
 
 //phaser-dependent
-function draw_chunk(
-	//graphics, 
-	chunk
-) {
-	let w = chunk_params.width,
-		h = chunk_params.height,
-		s = hex_size,
-		init_i = chunk.x * w;
-	for (let i = init_i; i < init_i + w; ++i) {
-		if (chunk.res[i - init_i] == undefined)
-			break;
-		let init_j = chunk.y * h;
-		for (let j = init_j; j < init_j + h; ++j) {
-			if (chunk.res[i - init_i][j - init_j] == undefined)
-				break;
-			let game_center = offset_to_pixel(
-				{row: i, col: j}, s, 
-				new Point(0, 0)
-			);
+//function draw_chunk(
+//	//graphics, 
+//	chunk
+//) {
+//	let w = chunk_params.width,
+//		h = chunk_params.height,
+//		s = hex_size,
+//		init_i = chunk.x * w;
+//	for (let i = init_i; i < init_i + w; ++i) {
+//		if (chunk.res[i - init_i] == undefined)
+//			break;
+//		let init_j = chunk.y * h;
+//		for (let j = init_j; j < init_j + h; ++j) {
+//			if (chunk.res[i - init_i][j - init_j] == undefined)
+//				break;
+//			let game_center = offset_to_pixel(
+//				{row: i, col: j}, s, 
+//				new Point(0, 0)
+//			);
 
 			//graphics.beginFill(getColor(chunk.res[i - init_i][j - init_j]));
 			//function getColor(index) {
@@ -205,16 +259,16 @@ function draw_chunk(
 
 			//graphics.endFill();
 
-			bmd.draw(getSprite(chunk.res[i - init_i][j - init_j]), game_center.px_x, game_center.px_y);
-			function getSprite(index) {
-				return empty_cell;
-			};
-			console.log(game_center.px_x + " " + game_center.px_y);
+//			bmd.draw(getSprite(chunk.res[i - init_i][j - init_j]), game_center.px_x, game_center.px_y);
+//			function getSprite(index) {
+//				return empty_cell;
+//			};
+//			console.log(game_center.px_x + " " + game_center.px_y);
 
 			//add smth with buildings
-		}
-	}
-};
+//		}
+//	}
+//};
 
 //phaser-dependent
 var main = function(game){};
