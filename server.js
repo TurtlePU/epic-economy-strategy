@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
-const map_gen = require('./map_gen');
+const map_gen = require('./lib/map_gen');
 
 app.get('/', function(req, res) {
 	res.sendFile(__dirname + '/client/index.html');
