@@ -152,12 +152,36 @@ function fillSpriteContainer(i, j) {
 	}
 	//TODO: set coords of chunk container
 	stage.addChild(chunkContainers[i][j]);
+	updRenderingBounds();
 };
 
 //TODO: Event handling
 //First - map move
 
 var lastBounds;
+
+const keyLeft = keyboard(65), keyRight = keyboard(68), keyUp = keyboard(87), keyDown = keyboard(83);
+
+keyLeft.press = function() {
+	focus = focus.add(new CE.Point(-5, 0));
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds();
+}
+keyRight.press = function() {
+	focus = focus.add(new CE.Point(5, 0));
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds();
+}
+keyUp.press = function() {
+	focus = focus.add(new CE.Point(0, -5));
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds();
+}
+keyDown.press = function() {
+	focus = focus.add(new CE.Point(0, 5));
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds();
+}
 
 function updRenderingBounds() {
 	let bounds = getRenderingBounds();
@@ -205,5 +229,36 @@ function setChunksVisible(x1, y1, x2, y2, value) {
 		for (let y = y1; y <= y2; ++y)
 			chunkContainers[y][x].visible = value;
 };
+
+function keyboard(keyCode) {
+	var key = {
+		code: keyCode,
+		isDown: false,
+		isUp: true,
+		press: function() {},
+		release: function() {},
+		downHandler: function(event) {
+			if (event.keyCode === key.code) {
+				if (key.isUp && key.press) key.press();
+				key.isDown = true;
+				key.isUp = false;
+			}
+			event.preventDefault();
+		},
+		upHandler: function(event) {
+			if (event.keyCode === key.code) {
+				if (key.isDown && key.release) key.release();
+				key.isDown = false;
+				key.isUp = true;
+			}
+			event.preventDefault();
+		};
+	};
+
+	window.addEventListener("keydown", key.downHandler.bind(key), false);
+	window.addEventListener("keyup", key.upHandler.bind(key), false);
+
+	return key;
+}
 
 gameCycle.start();

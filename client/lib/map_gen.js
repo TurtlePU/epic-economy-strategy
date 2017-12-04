@@ -43,10 +43,10 @@ var MapGen = {
 				for (let j = 0; j < length; ++j) {
 					let chunk_j = floor(j / h);
 					let dep_j = j - chunk_j * h;
-					if (chunks[chunk_i + '_' + chunk_j].res[dep_i] == undefined) {
-						chunks[chunk_i + '_' + chunk_j].res[dep_i] = [];
+					if (chunks[chunk_i][chunk_j].res[dep_i] == undefined) {
+						chunks[chunk_i][chunk_j].res[dep_i] = [];
 					}
-					chunks[chunk_i + '_' + chunk_j].res[dep_i][dep_j] = map[i + '_' + j];
+					chunks[chunk_i][chunk_j].res[dep_i][dep_j] = map[i][j];
 				}
 			}
 		}
