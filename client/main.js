@@ -65,7 +65,6 @@ function start() {
 	gl.render(stage);
 };
 
-//TODO: map index should be stored at server
 var mapOfChunks = [];
 var chunkContainers = [];
 var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
@@ -75,21 +74,21 @@ var CE;
 var chunkWidthInCells, chunkHeightInCells;
 var homeCell;
 var boundsOnMapInPixels, focus;
-//TODO: add socket.emit on server side
+
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
 
 	function fillVarFromData() {
-		mapSizeInCells = (1 << gameData.logSize) + 1;
-		chunkWidthInCells = gameData.chunkWidth;
-		chunkHeightInCells = gameData.chunkHeight;
+		mapSizeInCells = (1 << gameData.mapParams.logSize) + 1;
+		chunkWidthInCells = gameData.mapParams.chunkWidth;
+		chunkHeightInCells = gameData.mapParams.chunkHeight;
 
 		mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
 		mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
 
 		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
 
-		mapOfChunks = MapGen.buildChunked(gameData);
+		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
 		focus = homeCell.toPoint();

@@ -24,6 +24,7 @@ io.sockets.on('connection', function(socket) {
 	socket.on('new_player', function(data) {
 		console.log("new player");
 		var spawn = next_player();
+		field_list[spawn.i].push_player(data.id);
 		var new_player = new Player(
 			data.id, spawn
 			//another params
@@ -53,7 +54,7 @@ function compress(map, length) {
 			chunks[i][j] = {
 				x: i, y: j,
 				res: [[]],
-				//smth with buildings
+				bui: [[]]
 			};
 	}
 
@@ -88,7 +89,9 @@ function next_player() {
 		field_list.push({
 			filled: false,
 			map: [],
-			get_next: function() {return {row: 16, col: 16, i: i, params: params};}
+			players: [],
+			push_player: function(index) { players.push(index); }
+			get_next: function() {return { homeCell: { row: 16, col: 16 }, i: i, mapParams: params }; }
 		});
 		field_list[i].map = compress(map_gen.distributed_resource_map(params), (1 << params.log_size) + 1);
 		result = i;
