@@ -14,8 +14,8 @@ var Player = function(
 	player_id,
 	spawn_point
 ) {
-	var id = player_id;
-	var spawn = spawn_point;
+	this.getId = function() {return player_id;};
+	this.getSpawn = function() {return spawn_point;};
 };
 
 var field_list = [];
@@ -25,27 +25,19 @@ io.sockets.on('connection', function(socket) {
 		console.log("new player");
 		var spawn = next_player();
 		var new_player = new Player(
-			data.id, spawn//another params
+			data.id, spawn
+			//another params
 		);
 		player_list.push(new_player);
-		socket.emit('player_send', spawn);
+		socket.emit('gameDataSend', spawn);
 	});
-	socket.on('chunks_requested', function(bounds, index) {
-		console.log("chunks requested");
-		var res_list = [];
-		for (let i = bounds.left; i <= bounds.right; ++i) {
-			for (let j = bounds.top; j <= bounds.bottom; ++j) {
-				if (field_list[index].map[i + '_' + j] != undefined) {
-					res_list.push(field_list[index].map[i + '_' + j]);
-				}
-			}
-		}
-		socket.emit('chunks_received', res_list);
-	});
-	socket.on('chunk_updated_send', function(chunk, index) {
+	socket.on('chunkSend', function(chunk) {
 		console.log("chunk updated send");
-		field_list[index].map[chunk.i + '_' + chunk.j] = chunk;
-		io.emit('chunk_updated', chunk);
+		var mapID = player_list[player_list.find(function(elem, index, arr) {return elem.getId() == socket.id})].spawn.mapID;
+		field_list[mapID].map[chunk.i][chunk.j] = chunk;
+		field_list[mapID].players.forEach(function(elem, index, arr) {
+			io.to(elem).emit('chunkUpdated', chunk);
+		});
 	});
 	
 	//another events
@@ -55,13 +47,15 @@ function compress(map, length) {
 	var chunks = [];
 	let w = 3, h = 3;
 	let arr_w = Math.ceil(length / w), arr_h = Math.ceil(length / h)
-	for (let i = 0; i < arr_w; ++i)
+	for (let i = 0; i < arr_w; ++i) {
+		chunks[i] = [];
 		for (let j = 0; j < arr_h; ++j)
-			chunks[i + '_' + j] = {
+			chunks[i][j] = {
 				x: i, y: j,
 				res: [[]],
 				//smth with buildings
 			};
+	}
 
 	with(Math) {
 		for (let i = 0; i < length; ++i) {
@@ -70,10 +64,10 @@ function compress(map, length) {
 			for (let j = 0; j < length; ++j) {
 				let chunk_j = floor(j / h);
 				let dep_j = j - chunk_j * h;
-				if (chunks[chunk_i + '_' + chunk_j].res[dep_i] == undefined) {
-					chunks[chunk_i + '_' + chunk_j].res[dep_i] = [];
+				if (chunks[chunk_i][chunk_j].res[dep_i] == undefined) {
+					chunks[chunk_i][chunk_j].res[dep_i] = [];
 				}
-				chunks[chunk_i + '_' + chunk_j].res[dep_i][dep_j] = map[i + '_' + j];
+				chunks[chunk_i][chunk_j].res[dep_i][dep_j] = map[i][j];
 			}
 		}
 	}
@@ -90,12 +84,12 @@ function next_player() {
 	if (!found) {
 		console.log('new map');
 		let i = field_list.length;
+		var params = next_map();
 		field_list.push({
 			filled: false,
 			map: [],
-			get_next: function() {return {row: 16, col: 16, i: i};}
+			get_next: function() {return {row: 16, col: 16, i: i, params: params};}
 		});
-		var params = next_map();
 		field_list[i].map = compress(map_gen.distributed_resource_map(params), (1 << params.log_size) + 1);
 		result = i;
 	}

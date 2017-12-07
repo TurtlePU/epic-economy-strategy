@@ -21,7 +21,6 @@ class PseudoRandom {
 
 var MapGen = {
 	buildChunked: function(data) {
-		//rewrite a little
 		var chunks = [];
 		let size = (1 << data.logSize) + 1;
 		for (let i = 0; i < size; ++i)

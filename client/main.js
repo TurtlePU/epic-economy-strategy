@@ -156,79 +156,7 @@ function fillSpriteContainer(i, j) {
 };
 
 //TODO: Event handling
-//First - map move
-
-var lastBounds;
-
-const keyLeft = keyboard(65), keyRight = keyboard(68), keyUp = keyboard(87), keyDown = keyboard(83);
-
-keyLeft.press = function() {
-	focus = focus.add(new CE.Point(-5, 0));
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds();
-}
-keyRight.press = function() {
-	focus = focus.add(new CE.Point(5, 0));
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds();
-}
-keyUp.press = function() {
-	focus = focus.add(new CE.Point(0, -5));
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds();
-}
-keyDown.press = function() {
-	focus = focus.add(new CE.Point(0, 5));
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds();
-}
-
-function updRenderingBounds() {
-	let bounds = getRenderingBounds();
-	let x1 = lastBounds.x1,
-		x2 = lastBounds.x2,
-		y1 = lastBounds.y1,
-		y2 = lastBounds.y2,
-
-		tx1 = bounds.x1,
-		tx2 = bounds.x2,
-		ty1 = bounds.y1,
-		ty2 = bounds.y2;
-
-	with(Math) {
-		setChunksVisible(x1, min(x2, tx1 - 1), y1, min(y2, ty1 - 1), false);
-		setChunksVisible(max(x1, tx1), min(x2, tx2), y1, min(y2, ty1 - 1), false);
-		setChunksVisible(max(x1, tx2 + 1), x2, y1, min(y2, ty1 - 1), false);
-		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty1), min(y2, ty2), false);
-		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty1), min(y2, ty2), false);
-		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty2 + 1), y2, false);
-		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty2 + 1), y2, false);
-		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty2 + 1), y2, false);
-
-		setChunksVisible(tx1, min(tx2, x1 - 1), ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(max(tx1, x1), min(tx2, x2), ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y1), min(ty2, y2), true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y1), min(ty2, y2), true);
-		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y2 + 1), ty2, true);
-		setChunksVisible(max(tx1, x1), min(tx2, x2), max(ty1, y2 + 1), ty2, true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
-	}
-
-	lastBounds = bounds;
-};
-
-function getRenderingBounds() {
-	let tl = boundsOnMapInPixels.topLeft.toChunk(),
-		br = boundsOnMapInPixels.botRigt.toChunk();
-	return {x1: tl.getX(), x2: br.getX(), y1: tl.getY(), y2: br.getY()};
-};
-
-function setChunksVisible(x1, y1, x2, y2, value) {
-	for (let x = x1; x <= x2; ++x)
-		for (let y = y1; y <= y2; ++y)
-			chunkContainers[y][x].visible = value;
-};
+//Second - cell click
 
 function keyboard(keyCode) {
 	var key = {
@@ -260,5 +188,72 @@ function keyboard(keyCode) {
 
 	return key;
 }
+
+const 
+keyLeft = keyboard(65), 
+keyRight = keyboard(68), 
+keyUp = keyboard(87), 
+keyDown = keyboard(83);
+
+keyLeft.press = function() {moveScreenByPoint(new CE.Point(-5, 0));}
+keyRight.press = function() {moveScreenByPoint(new CE.Point(5, 0));}
+keyUp.press = function() {moveScreenByPoint(new CE.Point(0, -5));}
+keyDown.press = function() {moveScreenByPoint(new CE.Point(0, 5));}
+
+function moveScreenByPoint(point) {
+	focus = focus.add(point);
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds();
+}
+
+var lastBounds;
+
+function updRenderingBounds() {
+
+	function getRenderingBounds() {
+		let tl = boundsOnMapInPixels.topLeft.toChunk(),
+			br = boundsOnMapInPixels.botRigt.toChunk();
+		return {x1: tl.getX(), x2: br.getX(), y1: tl.getY(), y2: br.getY()};
+	};
+	let bounds = getRenderingBounds();
+	
+	let x1 = lastBounds.x1,
+		x2 = lastBounds.x2,
+		y1 = lastBounds.y1,
+		y2 = lastBounds.y2,
+
+		tx1 = bounds.x1,
+		tx2 = bounds.x2,
+		ty1 = bounds.y1,
+		ty2 = bounds.y2;
+
+	function setChunksVisible(x1, y1, x2, y2, value) {
+		for (let x = x1; x <= x2; ++x)
+			for (let y = y1; y <= y2; ++y)
+				chunkContainers[y][x].visible = value;
+	};
+
+	with(Math) {
+		setChunksVisible(x1, min(x2, tx1 - 1), y1, min(y2, ty1 - 1), false);
+		setChunksVisible(max(x1, tx1), min(x2, tx2), y1, min(y2, ty1 - 1), false);
+		setChunksVisible(max(x1, tx2 + 1), x2, y1, min(y2, ty1 - 1), false);
+		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty1), min(y2, ty2), false);
+		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty1), min(y2, ty2), false);
+		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty2 + 1), y2, false);
+		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty2 + 1), y2, false);
+		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty2 + 1), y2, false);
+
+		setChunksVisible(tx1, min(tx2, x1 - 1), ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(max(tx1, x1), min(tx2, x2), ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, ty1, min(ty2, y1 - 1), true);
+		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y1), min(ty2, y2), true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y1), min(ty2, y2), true);
+		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y2 + 1), ty2, true);
+		setChunksVisible(max(tx1, x1), min(tx2, x2), max(ty1, y2 + 1), ty2, true);
+		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
+	}
+
+	lastBounds = bounds;
+};
 
 gameCycle.start();
