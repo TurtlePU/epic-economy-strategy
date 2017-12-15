@@ -26,7 +26,8 @@ var MapGen = {
 		for (let i = 0; i < size; ++i)
 			chunks[i] = [];
 
-		let arr_w = Math.ceil(size / chunkWidth), arr_h = Math.ceil(size / chunkHeight);
+		let w = data.chunkWidth, h = data.chunkHeight;
+		let arr_w = Math.ceil(size / w), arr_h = Math.ceil(size / h);
 		for (let i = 0; i < arr_w; ++i)
 			for (let j = 0; j < arr_h; ++j)
 				chunks[i][j] = {
@@ -35,11 +36,13 @@ var MapGen = {
 					//smth with buildings
 				};
 
+		let map = this.__distributed_resource_map(data);
+
 		with(Math) {
-			for (let i = 0; i < length; ++i) {
+			for (let i = 0; i < size; ++i) {
 				let chunk_i = floor(i / w);
 				let dep_i = i - chunk_i * w;
-				for (let j = 0; j < length; ++j) {
+				for (let j = 0; j < size; ++j) {
 					let chunk_j = floor(j / h);
 					let dep_j = j - chunk_j * h;
 					if (chunks[chunk_i][chunk_j].res[dep_i] == undefined) {
@@ -64,6 +67,8 @@ var MapGen = {
 						count = 1;
 					else 
 						++count;
+				} else {
+					map[i][j] = 0;
 				}
 			}
 		}
@@ -161,3 +166,7 @@ var MapGen = {
 		return map;
 	}
 };
+
+module.exports = {
+	MapGen: MapGen
+}

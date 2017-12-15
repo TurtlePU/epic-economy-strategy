@@ -2,7 +2,6 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
     //(0, 0) in the center of topleft cell
     const sqrt3 = Math.sqrt(3);
     const CE = this;
-    const pixelShift = new CE.Point(sqrt3 * hexSize / 2, hexSize);
 
     this.Offset = function(row, col) {
         this.getRow = function() {return row;};
@@ -145,6 +144,8 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
             }
         };
     };
+
+    const pixelShift = new this.Point(sqrt3 * hexSize / 2, hexSize);
 
     this.Chunk = function(x, y) {
         this.getX = function() {return x;};

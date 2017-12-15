@@ -13,10 +13,10 @@ function texture(path) {
 };
 
 const imagePathList = [
-	"bmp/cell_color0.png", 
-	"bmp/cell_color1.png", 
-	"bmp/cell_color2.png", 
-	"bmp/cell_color3.png"
+	"client/bmp/cell_color0.png", 
+	"client/bmp/cell_color1.png", 
+	"client/bmp/cell_color2.png", 
+	"client/bmp/cell_color3.png"
 ];
 
 var gameCycle = {
@@ -50,7 +50,7 @@ function start() {
 		//loader.progress - progress in %
 	};
 	function emitPlayer() {
-		cellSideSizeInPixels = new PIXI.Sprite(texture("bmp/cell_color0.png")).height / 2;
+		cellSideSizeInPixels = new PIXI.Sprite(texture("client/bmp/cell_color0.png")).height / 2;
 		socket.emit('new_player', {
 			id: socket.id,
 			//maybe smth else
@@ -65,8 +65,8 @@ function start() {
 	gl.render(stage);
 };
 
-var mapOfChunks = [];
-var chunkContainers = [];
+var mapOfChunks = [[]];
+var chunkContainers = [[]];
 var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
 
 var CE;
@@ -75,94 +75,13 @@ var chunkWidthInCells, chunkHeightInCells;
 var homeCell;
 var boundsOnMapInPixels, focus;
 
-socket.on('gameDataSend', function(gameData) {
-	console.log("game data send");
+const 
+keyLeft = keyboard(65), 
+keyRight = keyboard(68), 
+keyUp = keyboard(87), 
+keyDown = keyboard(83);
 
-	function fillVarFromData() {
-		mapSizeInCells = (1 << gameData.mapParams.logSize) + 1;
-		chunkWidthInCells = gameData.mapParams.chunkWidth;
-		chunkHeightInCells = gameData.mapParams.chunkHeight;
-
-		mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
-		mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
-
-		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
-
-		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
-		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
-
-		focus = homeCell.toPoint();
-		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
-		boundsOnMapInPixels = {
-			topLeft: focus.sub(d),
-			botRigt: focus.add(d),
-			pushFocus: function() {
-				topLeft = focus.sub(d);
-				botRigt = focus.add(d);
-			}
-		}
-	};
-	fillVarFromData();
-
-	function fillSpriteArray() {
-		for (let i = 0; i < mapWidthInChunks; ++i) {
-			chunkContainers[i] = [];
-			for (let j = 0; j < mapHeightInChunks; ++j) {
-				fillSpriteContainer(i, j);
-			}
-		}
-	};
-	fillSpriteArray();
-});
-
-socket.on('chunkUpdated', function(chunk) {
-	console.log("chunk updated");
-	mapOfChunks[chunk.x][chunk.y] = chunk;
-	fillSpriteContainer(chunk.x, chunk.y);
-});
-
-function fillSpriteContainer(i, j) {
-	if (chunkContainers[i][j] != undefined)
-		stage.removeChild(chunkContainers[i][j]);
-	chunkContainers[i][j] = new PIXI.Container();
-
-	var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
-	chunkContainers[i][j].x = pixelCoord.x;
-	chunkContainers[i][j].y = pixelCoord.y;
-
-	function getPathsOfCellImage(x, y) {
-		return [
-			"bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".png",
-			"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".png"
-		];
-	};
-
-	function getSpritesOfCell(x, y) {
-		var strs = getPathsOfCellImage(x, y);
-		var arr = [];
-		strs.forEach(function(item, index, array) {
-			arr.add(new PIXI.Sprite(texture(item)));
-		});
-		return arr;
-	};
-
-	for (let x = 0; x < chunkWidthInCells; ++x) {
-		for (let y = 0; y < chunkHeightInCells; ++y) {
-			//TODO: set coords of sprites
-			var cellSprites = getSpritesOfCell(x, y);
-			chunkContainers[i][j].addChild(cellSprites[0], cellSprites[1]);
-			var pc = new CE.Offset(x, y).toPoint();
-			cellSprites[0].x = cellSprites[1].x = pc.x;
-			cellSprites[0].y = cellSprites[1].y = pc.y;
-		}
-	}
-	//TODO: set coords of chunk container
-	stage.addChild(chunkContainers[i][j]);
-	updRenderingBounds(null);
-};
-
-//TODO: Event handling
-//Second - cell click
+var lastBounds;
 
 function keyboard(keyCode) {
 	var key = {
@@ -186,7 +105,7 @@ function keyboard(keyCode) {
 				key.isUp = true;
 			}
 			event.preventDefault();
-		};
+		}
 	};
 
 	window.addEventListener("keydown", key.downHandler.bind(key), false);
@@ -195,26 +114,118 @@ function keyboard(keyCode) {
 	return key;
 }
 
-const 
-keyLeft = keyboard(65), 
-keyRight = keyboard(68), 
-keyUp = keyboard(87), 
-keyDown = keyboard(83);
+socket.on('gameDataSend', function(gameData) {
+	console.log("game data send");
 
-keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
-keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
-keyUp.press = moveScreenByPoint(new CE.Point(0, -5));
-keyDown.press = moveScreenByPoint(new CE.Point(0, 5));
+	function fillVarFromData() {
+		mapSizeInCells = (1 << gameData.mapParams.logSize) + 1;
+		chunkWidthInCells = gameData.mapParams.chunkWidth;
+		chunkHeightInCells = gameData.mapParams.chunkHeight;
 
-function moveScreenByPoint(point) {
-	return () => {
-		focus = focus.add(point);
-		boundsOnMapInPixels.pushFocus();
-		updRenderingBounds(point);
+		mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
+		mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
+
+		lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks, y2: mapHeightInChunks};
+
+		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
+
+		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
+		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
+
+		focus = homeCell.toPoint();
+		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		boundsOnMapInPixels = {
+			topLeft: focus.sub(d),
+			botRigt: focus.add(d),
+			pushFocus: function() {
+				topLeft = focus.sub(d);
+				botRigt = focus.add(d);
+			}
+		}
+
+		stage.x = -focus.getX();
+		stage.y = -focus.getY();
+
+		keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
+		keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
+		keyUp.press = moveScreenByPoint(new CE.Point(0, -5));
+		keyDown.press = moveScreenByPoint(new CE.Point(0, 5));
+
+		function moveScreenByPoint(point) {
+			return () => {
+				focus = focus.add(point);
+				boundsOnMapInPixels.pushFocus();
+				updRenderingBounds(point);
+			}
+		}
+	};
+	fillVarFromData();
+
+	function fillSpriteArray() {
+		for (let i = 0; i < mapWidthInChunks; ++i) {
+			chunkContainers[i] = [];
+			for (let j = 0; j < mapHeightInChunks; ++j) {
+				fillSpriteContainer(i, j);
+			}
+		}
+	};
+	fillSpriteArray();
+});
+
+socket.on('chunkUpdated', function(chunk) {
+	console.log("chunk updated");
+	mapOfChunks[chunk.x][chunk.y] = chunk;
+	fillSpriteContainer(chunk.x, chunk.y);
+	updRenderingBounds(new CE.Point(0, 0));
+});
+
+function fillSpriteContainer(i, j) {
+	if (chunkContainers[i][j] != undefined)
+		stage.removeChild(chunkContainers[i][j]);
+	chunkContainers[i][j] = new PIXI.Container();
+	
+	var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
+	chunkContainers[i][j].x = pixelCoord.x;
+	chunkContainers[i][j].y = pixelCoord.y;
+
+	function getPathsOfCellImage(x, y) {
+		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
+		return [
+			"client/bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".png"//,
+			//"client/bmp/building" + mapOfChunks[i][j].bui[x][y] + ".png"
+		];
+	};
+
+	function getSpritesOfCell(x, y) {
+		var strs = getPathsOfCellImage(x, y);
+		var arr = [];
+		strs.forEach(function(item, index, array) {
+			arr.push(new PIXI.Sprite(texture(item)));
+		});
+		return arr;
+	};
+
+	for (let x = 0; x < chunkWidthInCells; ++x) {
+		for (let y = 0; y < chunkHeightInCells; ++y) {
+			var cellSprites = getSpritesOfCell(x, y);
+			chunkContainers[i][j].addChild(
+				cellSprites[0]//, 
+				//cellSprites[1]
+			);
+			var pc = new CE.Offset(x, y).toPoint();
+			cellSprites[0].x = 
+				//cellSprites[1].x = 
+					pc.x;
+			cellSprites[0].y = 
+				//cellSprites[1].y = 
+					pc.y;
+		}
 	}
-}
+	stage.addChild(chunkContainers[i][j]);
+};
 
-var lastBounds;
+//TODO: Event handling
+//Second - cell click
 
 function updRenderingBounds(delta) {
 
@@ -235,10 +246,12 @@ function updRenderingBounds(delta) {
 		ty1 = bounds.y1,
 		ty2 = bounds.y2;
 
-	function setChunksVisible(x1, y1, x2, y2, value) {
+	function setChunksVisible(x1, x2, y1, y2, value) {
 		for (let x = x1; x <= x2; ++x)
-			for (let y = y1; y <= y2; ++y)
-				chunkContainers[y][x].visible = value;
+			for (let y = y1; y <= y2; ++y) {
+				console.log(`${x} ${y}`);
+				chunkContainers[x][y].visible = value;
+			}
 	};
 
 	with(Math) {
@@ -261,10 +274,8 @@ function updRenderingBounds(delta) {
 		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
 	}
 
-	if (lastBounds) {
-		stage.x -= delta.x;
-		stage.y -= delta.y;
-	}
+	stage.x -= delta.getX();
+	stage.y -= delta.getY();
 	lastBounds = bounds;
 };
 

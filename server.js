@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
-const map_gen = require('./lib/map_gen');
+const map_gen = require('./client/lib/map_gen').MapGen;
 
 app.get('/', function(req, res) {
 	res.sendFile(__dirname + '/client/index.html');
@@ -44,37 +44,6 @@ io.sockets.on('connection', function(socket) {
 	//another events
 });
 
-function compress(map, length) {
-	var chunks = [];
-	let w = 3, h = 3;
-	let arr_w = Math.ceil(length / w), arr_h = Math.ceil(length / h)
-	for (let i = 0; i < arr_w; ++i) {
-		chunks[i] = [];
-		for (let j = 0; j < arr_h; ++j)
-			chunks[i][j] = {
-				x: i, y: j,
-				res: [[]],
-				bui: [[]]
-			};
-	}
-
-	with(Math) {
-		for (let i = 0; i < length; ++i) {
-			let chunk_i = floor(i / w);
-			let dep_i = i - chunk_i * w;
-			for (let j = 0; j < length; ++j) {
-				let chunk_j = floor(j / h);
-				let dep_j = j - chunk_j * h;
-				if (chunks[chunk_i][chunk_j].res[dep_i] == undefined) {
-					chunks[chunk_i][chunk_j].res[dep_i] = [];
-				}
-				chunks[chunk_i][chunk_j].res[dep_i][dep_j] = map[i][j];
-			}
-		}
-	}
-	return chunks;
-}
-
 function next_player() {
 	//will be different
 	let result;
@@ -91,7 +60,7 @@ function next_player() {
 			map: [],
 			players: [],
 			push_player: function(index) { 
-				players.push(index); 
+				this.players.push(index); 
 			},
 			get_next: function() {
 				return { 
@@ -104,7 +73,7 @@ function next_player() {
 				}; 
 			}
 		});
-		field_list[i].map = compress(map_gen.distributed_resource_map(params), (1 << params.log_size) + 1);
+		field_list[i].map = map_gen.buildChunked(params);
 		result = i;
 	}
 	return field_list[result].get_next();
