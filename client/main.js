@@ -126,15 +126,19 @@ function fillSpriteContainer(i, j) {
 		stage.removeChild(chunkContainers[i][j]);
 	chunkContainers[i][j] = new PIXI.Container();
 
-	function getPathsOfCellImage(i, j, x, y) {
+	var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
+	chunkContainers[i][j].x = pixelCoord.x;
+	chunkContainers[i][j].y = pixelCoord.y;
+
+	function getPathsOfCellImage(x, y) {
 		return [
 			"bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".bmp",
 			"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".bmp"
 		];
 	};
 
-	function getSpritesOfCell(i, j, x, y) {
-		var strs = getPathsOfCellImage(i, j, x, y);
+	function getSpritesOfCell(x, y) {
+		var strs = getPathsOfCellImage(x, y);
 		var arr = [];
 		strs.forEach(function(item, index, array) {
 			arr.add(new PIXI.Sprite(texture(item)));
@@ -145,13 +149,16 @@ function fillSpriteContainer(i, j) {
 	for (let x = 0; x < chunkWidthInCells; ++x) {
 		for (let y = 0; y < chunkHeightInCells; ++y) {
 			//TODO: set coords of sprites
-			var cellSprites = getSpritesOfCell(i, j, x, y);
+			var cellSprites = getSpritesOfCell(x, y);
 			chunkContainers[i][j].addChild(cellSprites[0], cellSprites[1]);
+			var pc = new CE.Offset(x, y).toPoint();
+			cellSprites[0].x = cellSprites[1].x = pc.x;
+			cellSprites[0].y = cellSprites[1].y = pc.y;
 		}
 	}
 	//TODO: set coords of chunk container
 	stage.addChild(chunkContainers[i][j]);
-	updRenderingBounds();
+	updRenderingBounds(null);
 };
 
 //TODO: Event handling
@@ -194,20 +201,22 @@ keyRight = keyboard(68),
 keyUp = keyboard(87), 
 keyDown = keyboard(83);
 
-keyLeft.press = function() {moveScreenByPoint(new CE.Point(-5, 0));}
-keyRight.press = function() {moveScreenByPoint(new CE.Point(5, 0));}
-keyUp.press = function() {moveScreenByPoint(new CE.Point(0, -5));}
-keyDown.press = function() {moveScreenByPoint(new CE.Point(0, 5));}
+keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
+keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
+keyUp.press = moveScreenByPoint(new CE.Point(0, -5));
+keyDown.press = moveScreenByPoint(new CE.Point(0, 5));
 
 function moveScreenByPoint(point) {
-	focus = focus.add(point);
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds();
+	return () => {
+		focus = focus.add(point);
+		boundsOnMapInPixels.pushFocus();
+		updRenderingBounds(point);
+	}
 }
 
 var lastBounds;
 
-function updRenderingBounds() {
+function updRenderingBounds(delta) {
 
 	function getRenderingBounds() {
 		let tl = boundsOnMapInPixels.topLeft.toChunk(),
@@ -252,6 +261,10 @@ function updRenderingBounds() {
 		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
 	}
 
+	if (lastBounds) {
+		stage.x -= delta.x;
+		stage.y -= delta.y;
+	}
 	lastBounds = bounds;
 };
 

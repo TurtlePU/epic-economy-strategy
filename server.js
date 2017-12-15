@@ -37,7 +37,7 @@ io.sockets.on('connection', function(socket) {
 		var mapID = player_list[player_list.find(function(elem, index, arr) {return elem.getId() == socket.id})].spawn.mapID;
 		field_list[mapID].map[chunk.i][chunk.j] = chunk;
 		field_list[mapID].players.forEach(function(elem, index, arr) {
-			io.to(elem).emit('chunkUpdated', chunk);
+			io.to(elem.getId()).emit('chunkUpdated', chunk);
 		});
 	});
 	
@@ -90,8 +90,19 @@ function next_player() {
 			filled: false,
 			map: [],
 			players: [],
-			push_player: function(index) { players.push(index); }
-			get_next: function() {return { homeCell: { row: 16, col: 16 }, i: i, mapParams: params }; }
+			push_player: function(index) { 
+				players.push(index); 
+			},
+			get_next: function() {
+				return { 
+					homeCell: { 
+						row: 16, 
+						col: 16 
+					}, 
+					i: i, 
+					mapParams: params 
+				}; 
+			}
 		});
 		field_list[i].map = compress(map_gen.distributed_resource_map(params), (1 << params.log_size) + 1);
 		result = i;
@@ -107,13 +118,15 @@ function next_map() {
 		c: 16,
 		mod: 228,
 		seed: 0,
-		log_size: 10,
+		logSize: 10,
 		height: 100,
 		prob_a: 15, 
 		prob_b: 5,
 		prob_c: 869,
 		prob_mod: 100,
-		prob_seed: 80
+		prob_seed: 80,
+		chunkWidth: 3,
+		chunkHeight: 3
 	};
 };
 
