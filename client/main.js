@@ -13,10 +13,10 @@ function texture(path) {
 };
 
 const imagePathList = [
-	"bmp/cell_color0.bmp", 
-	"bmp/cell_color1.bmp", 
-	"bmp/cell_color2.bmp", 
-	"bmp/cell_color3.bmp"
+	"bmp/cell_color0.png", 
+	"bmp/cell_color1.png", 
+	"bmp/cell_color2.png", 
+	"bmp/cell_color3.png"
 ];
 
 var gameCycle = {
@@ -50,7 +50,7 @@ function start() {
 		//loader.progress - progress in %
 	};
 	function emitPlayer() {
-		cellSideSizeInPixels = new PIXI.Sprite(texture("bmp/cell_color0.bmp")).height / 2;
+		cellSideSizeInPixels = new PIXI.Sprite(texture("bmp/cell_color0.png")).height / 2;
 		socket.emit('new_player', {
 			id: socket.id,
 			//maybe smth else
@@ -132,8 +132,8 @@ function fillSpriteContainer(i, j) {
 
 	function getPathsOfCellImage(x, y) {
 		return [
-			"bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".bmp",
-			"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".bmp"
+			"bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".png",
+			"bmp/building" + mapOfChunks[i][j].bui[x][y] + ".png"
 		];
 	};
 
