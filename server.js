@@ -5,7 +5,7 @@ const io = require('socket.io')(server);
 const map_gen = require('./client/lib/map_gen').MapGen;
 
 app.get('/', function(req, res) {
-	res.sendFile(__dirname + '/client/index.html');
+	res.sendFile(__dirname + '/index.html');
 });
 app.use('/client', express.static(__dirname + '/client'));
 

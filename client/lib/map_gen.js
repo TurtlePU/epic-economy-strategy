@@ -23,19 +23,19 @@ var MapGen = {
 	buildChunked: function(data) {
 		var chunks = [];
 		let size = (1 << data.logSize) + 1;
-		for (let i = 0; i < size; ++i)
-			chunks[i] = [];
-
 		let w = data.chunkWidth, h = data.chunkHeight;
 		let arr_w = Math.ceil(size / w), arr_h = Math.ceil(size / h);
-		for (let i = 0; i < arr_w; ++i)
+		
+		for (let i = 0; i < arr_w; ++i) {
+			chunks[i] = [];
 			for (let j = 0; j < arr_h; ++j)
 				chunks[i][j] = {
 					x: i, y: j,
 					res: [[]],
 					//smth with buildings
 				};
-
+		}
+		
 		let map = this.__distributed_resource_map(data);
 
 		with(Math) {
@@ -57,7 +57,7 @@ var MapGen = {
 	__distributed_resource_map: function(pack) {
 		var map = this.__resource_map(pack);
 		//maybe we can find better distibution
-		var size = (1 << pack.log_size) + 1;
+		var size = (1 << pack.logSize) + 1;
 		var count = 1;
 		for (let i = 0; i < size; ++i) {
 			for (let j = 0; j < size; ++j) {

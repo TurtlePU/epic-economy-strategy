@@ -40,6 +40,8 @@ function start() {
 		gl.view.style.display = "block";
 		gl.autoResize = true;
 		gl.resize(window.innerWidth, window.innerHeight);
+		stage.x = 0;
+		stage.y = 0;
 	};
 	resizeRenderer();
 	document.body.appendChild(gl.view);
@@ -125,7 +127,7 @@ socket.on('gameDataSend', function(gameData) {
 		mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
 		mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
 
-		lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks, y2: mapHeightInChunks};
+		lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks - 1, y2: mapHeightInChunks - 1};
 
 		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
 
@@ -143,8 +145,8 @@ socket.on('gameDataSend', function(gameData) {
 			}
 		}
 
-		stage.x = -focus.getX();
-		stage.y = -focus.getY();
+		//stage.x = -focus.getX() + d.getX();
+		//stage.y = -focus.getY() + d.getY();
 
 		keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
 		keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
@@ -170,6 +172,10 @@ socket.on('gameDataSend', function(gameData) {
 		}
 	};
 	fillSpriteArray();
+	console.log("sprite array filled");
+	updRenderingBounds(new CE.Point(0, 0));
+
+	gl.render(stage);
 });
 
 socket.on('chunkUpdated', function(chunk) {
@@ -180,6 +186,7 @@ socket.on('chunkUpdated', function(chunk) {
 });
 
 function fillSpriteContainer(i, j) {
+	//console.log(mapOfChunks[i][j].res);
 	if (chunkContainers[i][j] != undefined)
 		stage.removeChild(chunkContainers[i][j]);
 	chunkContainers[i][j] = new PIXI.Container();
@@ -206,6 +213,7 @@ function fillSpriteContainer(i, j) {
 	};
 
 	for (let x = 0; x < chunkWidthInCells; ++x) {
+		if (!mapOfChunks[i][j].res[x]) break;
 		for (let y = 0; y < chunkHeightInCells; ++y) {
 			var cellSprites = getSpritesOfCell(x, y);
 			chunkContainers[i][j].addChild(
@@ -249,7 +257,7 @@ function updRenderingBounds(delta) {
 	function setChunksVisible(x1, x2, y1, y2, value) {
 		for (let x = x1; x <= x2; ++x)
 			for (let y = y1; y <= y2; ++y) {
-				console.log(`${x} ${y}`);
+				//console.log(`${x} ${y}`);
 				chunkContainers[x][y].visible = value;
 			}
 	};
