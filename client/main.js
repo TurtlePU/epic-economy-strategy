@@ -7,7 +7,7 @@ socket.on('connect', function() {
 
 //PIXI.js
 const gl = PIXI.autoDetectRenderer(256, 256);
-const stage = new PIXI.Container();
+const content = new PIXI.Container(), stage = new PIXI.Container();
 function texture(path) {
 	return PIXI.loader.resources[path].texture;
 };
@@ -40,8 +40,6 @@ function start() {
 		gl.view.style.display = "block";
 		gl.autoResize = true;
 		gl.resize(window.innerWidth, window.innerHeight);
-		stage.x = 0;
-		stage.y = 0;
 	};
 	resizeRenderer();
 	document.body.appendChild(gl.view);
@@ -63,8 +61,6 @@ function start() {
 		.add(imagePathList)
 		.on("progress", showProgress)
 		.load(emitPlayer);
-
-	gl.render(stage);
 };
 
 var mapOfChunks = [[]];
@@ -94,7 +90,9 @@ function keyboard(keyCode) {
 		release: function() {},
 		downHandler: function(event) {
 			if (event.keyCode === key.code) {
-				if (key.isUp && key.press) key.press();
+				if (key.isUp && key.press) {
+					key.press();
+				}
 				key.isDown = true;
 				key.isUp = false;
 			}
@@ -102,7 +100,9 @@ function keyboard(keyCode) {
 		},
 		upHandler: function(event) {
 			if (event.keyCode === key.code) {
-				if (key.isDown && key.release) key.release();
+				if (key.isDown && key.release) {
+					key.release();
+				}
 				key.isDown = false;
 				key.isUp = true;
 			}
@@ -135,18 +135,19 @@ socket.on('gameDataSend', function(gameData) {
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
 		focus = homeCell.toPoint();
-		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
+		padding = new CE.Point(cellSideSizeInPixels * chunkWidthInCells, cellSideSizeInPixels * chunkHeightInCells);
 		boundsOnMapInPixels = {
 			topLeft: focus.sub(d),
 			botRigt: focus.add(d),
 			pushFocus: function() {
-				topLeft = focus.sub(d);
-				botRigt = focus.add(d);
+				this.topLeft = focus.sub(d).sub(padding);
+				this.botRigt = focus.add(d);
 			}
 		}
 
-		//stage.x = -focus.getX() + d.getX();
-		//stage.y = -focus.getY() + d.getY();
+		stage.x = -focus.getX() + d.getX();
+		stage.y = -focus.getY() + d.getY();
 
 		keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
 		keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
@@ -163,6 +164,9 @@ socket.on('gameDataSend', function(gameData) {
 	};
 	fillVarFromData();
 
+	content.addChild(stage);
+	gl.render(content);
+
 	function fillSpriteArray() {
 		for (let i = 0; i < mapWidthInChunks; ++i) {
 			chunkContainers[i] = [];
@@ -174,8 +178,6 @@ socket.on('gameDataSend', function(gameData) {
 	fillSpriteArray();
 	console.log("sprite array filled");
 	updRenderingBounds(new CE.Point(0, 0));
-
-	gl.render(stage);
 });
 
 socket.on('chunkUpdated', function(chunk) {
@@ -192,8 +194,8 @@ function fillSpriteContainer(i, j) {
 	chunkContainers[i][j] = new PIXI.Container();
 	
 	var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
-	chunkContainers[i][j].x = pixelCoord.x;
-	chunkContainers[i][j].y = pixelCoord.y;
+	chunkContainers[i][j].x = pixelCoord.getX();
+	chunkContainers[i][j].y = pixelCoord.getY();
 
 	function getPathsOfCellImage(x, y) {
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
@@ -223,10 +225,10 @@ function fillSpriteContainer(i, j) {
 			var pc = new CE.Offset(x, y).toPoint();
 			cellSprites[0].x = 
 				//cellSprites[1].x = 
-					pc.x;
+					pc.getX();
 			cellSprites[0].y = 
 				//cellSprites[1].y = 
-					pc.y;
+					pc.getY();
 		}
 	}
 	stage.addChild(chunkContainers[i][j]);
@@ -255,11 +257,14 @@ function updRenderingBounds(delta) {
 		ty2 = bounds.y2;
 
 	function setChunksVisible(x1, x2, y1, y2, value) {
-		for (let x = x1; x <= x2; ++x)
+		if (x1 > x2 || y1 > y2) return;
+		for (let x = x1; x <= x2; ++x) {
+			if (!chunkContainers[x]) continue;
 			for (let y = y1; y <= y2; ++y) {
-				//console.log(`${x} ${y}`);
+				if (!chunkContainers[x][y]) continue;
 				chunkContainers[x][y].visible = value;
 			}
+		}
 	};
 
 	with(Math) {
@@ -280,11 +285,15 @@ function updRenderingBounds(delta) {
 		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y2 + 1), ty2, true);
 		setChunksVisible(max(tx1, x1), min(tx2, x2), max(ty1, y2 + 1), ty2, true);
 		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
+
+		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty1), min(y2, ty2), true);
 	}
 
 	stage.x -= delta.getX();
 	stage.y -= delta.getY();
 	lastBounds = bounds;
+
+	gl.render(content);
 };
 
 gameCycle.start();

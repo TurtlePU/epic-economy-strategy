@@ -1,22 +1,14 @@
-class PseudoRandom {
-	constructor(a, b, c, mod, seed) {
-		this.elem = seed;
-		this.prev = 0;
-		this.a = a;
-		this.b = b;
-		this.c = c;
-	}
-
-	getNext() {
-		var t = (this.a * this.elem + this.b * this.prev + this.c) % this.mod;
-		this.prev = this.elem;
-		this.elem = t;
-		return t / this.mod;
-	}
-
-	getRanged(from, to) {
+var PseudoRandom  = function(a, b, c, mod, elem) {
+	var prev = 0;
+	this.getNext = function() {
+		var t = (a * elem + b * prev + c) % mod;
+		prev = elem;
+		elem = t;
+		return t / mod;
+	};
+	this.getRanged = function(from, to) {
 		return (to - from + 1) * this.getNext() + from;
-	}
+	};
 };
 
 var MapGen = {
@@ -98,10 +90,12 @@ var MapGen = {
 		};
 
 		var size = (1 << pack.logSize) + 1;
-		for (let i = 0; i < size; ++i)
-			for (let j = 0; j < size; ++j)
+		for (let i = 0; i < size; ++i) {
+			for (let j = 0; j < size; ++j) {
 				map[i][j] = 
-					(gen.getNext() < getProb(map[i][j]));
+					(gen.getNext() < getProb(map[i][j])); 
+			}
+		}
 		return map;
 	},
 	diamondSquare: function(a, b, c, mod, seed, log_size, height) {

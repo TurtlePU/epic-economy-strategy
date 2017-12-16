@@ -22,7 +22,7 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
         };
         this.toChunk = function() {
             with(Math) {
-                return new CE.Chunk(floor(col / chunkWidth), floor(row / chunkHeight));
+                return new CE.Chunk(floor(row / chunkHeight), floor(col / chunkWidth));
             }
         };
 
@@ -159,8 +159,8 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
 
         this.toOffset = function() {
             return new CE.Offset(
-                x * chunkWidth,
-                y * chunkHeight);
+                x * chunkHeight,
+                y * chunkWidth);
         };
 
         this.upperLeftPixel = function() {
