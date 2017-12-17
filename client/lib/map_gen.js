@@ -4,10 +4,10 @@ var PseudoRandom  = function(a, b, c, mod, elem) {
 		var t = (a * elem + b * prev + c) % mod;
 		prev = elem;
 		elem = t;
-		return t / mod;
+		return t;
 	};
 	this.getRanged = function(from, to) {
-		return (to - from + 1) * this.getNext() + from;
+		return 1.0 * (to - from) * this.getNext() / mod + from;
 	};
 };
 
@@ -73,27 +73,14 @@ var MapGen = {
 			pack.prob_mod, pack.prob_seed);
 
 		function getProb(depth) {
-			let ratio = depth / pack.height;
-			if (ratio <= -0.8)
-				return 1 - 0.21;
-			if (ratio <= -0.6)
-				return 1 - 0.14;
-			if (ratio <= -0.2)
-				return 1 - 0.07;
-			if (ratio <= 0)
-				return 1 - 0.21;
-			if (ratio <= 0.2)
-				return 1 - 0.42;
-			if (ratio <= 0.4)
-				return 1 - 0.63;
-			return 1 - 0.84;
+			return Math.abs(depth) / pack.height;
 		};
 
 		var size = (1 << pack.logSize) + 1;
 		for (let i = 0; i < size; ++i) {
 			for (let j = 0; j < size; ++j) {
 				map[i][j] = 
-					(gen.getNext() < getProb(map[i][j])); 
+					(gen.getRanged(0, 1) * getProb(map[i][j]) > (1 - pack.richness)); 
 			}
 		}
 		return map;
