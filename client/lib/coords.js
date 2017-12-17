@@ -146,6 +146,7 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
     };
 
     const pixelShift = new this.Point(sqrt3 * hexSize / 2, hexSize);
+    this.getPixelShift = function() {return pixelShift;};
 
     this.Chunk = function(x, y) {
         this.getX = function() {return x;};
