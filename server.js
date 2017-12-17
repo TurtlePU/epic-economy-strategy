@@ -3,11 +3,32 @@ const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 const map_gen = require('./client/lib/map_gen').MapGen;
+const Papa = require('papaparse');
+const fs = require('fs');
 
 app.get('/', function(req, res) {
 	res.sendFile(__dirname + '/index.html');
 });
 app.use('/client', express.static(__dirname + '/client'));
+
+var mapData;
+fs.readFile('./res/map-table.csv', function(err, data) {
+	mapData = Papa.parse(data, {
+		complete: function(result) {
+			console.log("Parsed map data: " + result.data);
+		}
+	});
+});
+var dataLoaded = false;
+var buiData;
+fs.readFile('./res/buildings-table.csv', function(err, data) {
+	buiData = Papa.parse(data, {
+		complete: function(result) {
+			console.log("Parsed buildings data: " + result.data);
+			dataLoaded = true;
+		}
+	});
+});
 
 var player_list = [];
 var Player = function(
@@ -19,28 +40,30 @@ var Player = function(
 };
 
 var field_list = [];
+
 io.sockets.on('connection', function(socket) {
 	console.log("socket connected");
-	socket.on('new_player', function(data) {
-		console.log("new player");
-		var spawn = next_player();
-		field_list[spawn.i].push_player(data.id);
-		var new_player = new Player(
-			data.id, spawn
-			//another params
-		);
-		player_list.push(new_player);
-		socket.emit('gameDataSend', spawn);
-	});
-	socket.on('chunkSend', function(chunk) {
-		console.log("chunk updated send");
-		var mapID = player_list[player_list.find(function(elem, index, arr) {return elem.getId() == socket.id})].spawn.mapID;
-		field_list[mapID].map[chunk.i][chunk.j] = chunk;
-		field_list[mapID].players.forEach(function(elem, index, arr) {
-			io.to(elem.getId()).emit('chunkUpdated', chunk);
+	if (dataLoaded) {
+		socket.on('new_player', function(data) {
+			console.log("new player");
+			var spawn = next_player();
+			field_list[spawn.i].push_player(data.id);
+			var new_player = new Player(
+				data.id, spawn
+				//another params
+			);
+			player_list.push(new_player);
+			socket.emit('gameDataSend', spawn);
 		});
-	});
-	
+		socket.on('chunkSend', function(chunk) {
+			console.log("chunk updated send");
+			var mapID = player_list[player_list.find(function(elem, index, arr) {return elem.getId() == socket.id})].spawn.mapID;
+			field_list[mapID].map[chunk.i][chunk.j] = chunk;
+			field_list[mapID].players.forEach(function(elem, index, arr) {
+				io.to(elem.getId()).emit('chunkUpdated', chunk);
+			});
+		});
+	}
 	//another events
 });
 
@@ -49,7 +72,7 @@ function next_player() {
 	let result;
 	let found = field_list.some(function(item, index, array){
 		result = index;
-		return item.filled;
+		return !item.filled;
 	});
 	if (!found) {
 		console.log('new map');
@@ -94,7 +117,7 @@ function next_map() {
 		prob_c: 15,
 		prob_mod: 1 << 30,
 		prob_seed: 179,
-		richness: 0.67,
+		richness: 0.7,
 		chunkWidth: 3,
 		chunkHeight: 3
 	};
