@@ -88,12 +88,12 @@ function next_map() {
 		mod: 228,
 		seed: 0,
 		logSize: 10,
-		height: 100,
-		prob_a: 15, 
-		prob_b: 5,
-		prob_c: 869,
-		prob_mod: 100,
-		prob_seed: 80,
+		height: 1,
+		prob_a: 17, 
+		prob_b: 0,
+		prob_c: 15,
+		prob_mod: 1 << 16,
+		prob_seed: 0,
 		chunkWidth: 3,
 		chunkHeight: 3
 	};

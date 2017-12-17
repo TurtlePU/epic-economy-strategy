@@ -75,18 +75,18 @@ var MapGen = {
 		function getProb(depth) {
 			let ratio = depth / pack.height;
 			if (ratio <= -0.8)
-				return 0.21;
+				return 1 - 0.21;
 			if (ratio <= -0.6)
-				return 0.14;
+				return 1 - 0.14;
 			if (ratio <= -0.2)
-				return 0.07;
+				return 1 - 0.07;
 			if (ratio <= 0)
-				return 0.21;
+				return 1 - 0.21;
 			if (ratio <= 0.2)
-				return 0.42;
+				return 1 - 0.42;
 			if (ratio <= 0.4)
-				return 0.63;
-			return 0.84;
+				return 1 - 0.63;
+			return 1 - 0.84;
 		};
 
 		var size = (1 << pack.logSize) + 1;
