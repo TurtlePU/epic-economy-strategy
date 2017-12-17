@@ -1,5 +1,5 @@
-func;in;in_u;time;time_u;cap;cap_u;out;out_u;cost;cost_u
-mine;260;+19;20;-3;0;0;180;+18;"50;50/1000";*2
-mine_u;216;+16;20;-3;0;0;150;+15;;
-rec;;;;;;;;;;
-rec_u;;;;;;;;;;
+func;in;in_u;time;time_u;cap;cap_u;out;out_u;cost_res;cost_gold;cost_u
+mine;260;add 19;20;add -3;0;add 0;180;add 18;50;1000;multiply 2
+mine_u;216;add 16;20;add -3;0;add 0;150;add 15;-1;1500;multiply 2
+rec;360;add 6;20;add -2;0;add 0;216;add 18;100;2000;multiply 3
+rec_u;281;add 5;20;add -2;0;add 0;180;add 15;-1;3000;multiply 3
