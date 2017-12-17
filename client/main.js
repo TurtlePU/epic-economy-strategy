@@ -153,10 +153,11 @@ socket.on('gameDataSend', function(gameData) {
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
 
-		keyLeft.press = keyRight.release = moveScreenByPoint(new CE.Point(-5, 0));
-		keyRight.press = keyLeft.release = moveScreenByPoint(new CE.Point(5, 0));
-		keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -5));
-		keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, 5));
+		var step = 3;
+		keyLeft.press = keyRight.release = moveScreenByPoint(new CE.Point(-step, 0));
+		keyRight.press = keyLeft.release = moveScreenByPoint(new CE.Point(step, 0));
+		keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -step));
+		keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, step));
 
 		function moveScreenByPoint(point) {
 			return () => {
@@ -179,14 +180,14 @@ socket.on('gameDataSend', function(gameData) {
 	};
 	fillSpriteArray();
 	console.log("sprite array filled");
-	updRenderingBounds(new CE.Point(0, 0));
+	updRenderingBounds(zeroPoint);
 });
 
 socket.on('chunkUpdated', function(chunk) {
 	console.log("chunk updated");
 	mapOfChunks[chunk.x][chunk.y] = chunk;
 	fillSpriteContainer(chunk.x, chunk.y);
-	updRenderingBounds(new CE.Point(0, 0));
+	updRenderingBounds(zeroPoint);
 });
 
 function fillSpriteContainer(i, j) {
@@ -244,7 +245,7 @@ function velocityTick() {
 	boundsOnMapInPixels.pushFocus();
 	updRenderingBounds(focusVelocity);
 }
-setInterval(velocityTick, 15);
+setInterval(velocityTick, 2);
 
 function updRenderingBounds(delta) {
 
