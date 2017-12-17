@@ -68,10 +68,12 @@ var chunkContainers = [[]];
 var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
 
 var CE;
+var zeroPoint;
 
 var chunkWidthInCells, chunkHeightInCells;
 var homeCell;
-var boundsOnMapInPixels, focus;
+var boundsOnMapInPixels;
+var focus, focusVelocity;
 
 const 
 keyLeft = keyboard(65), 
@@ -130,35 +132,35 @@ socket.on('gameDataSend', function(gameData) {
 		lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks - 1, y2: mapHeightInChunks - 1};
 
 		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
+		zeroPoint = new CE.Point(0, 0);
 
 		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
 		focus = homeCell.toPoint();
+		focusVelocity = zeroPoint;
 		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
 		padding = new CE.Point(cellSideSizeInPixels * chunkWidthInCells, cellSideSizeInPixels * chunkHeightInCells);
 		boundsOnMapInPixels = {
-			topLeft: focus.sub(d),
-			botRigt: focus.add(d),
+			topLeft: focus.sub(d).sub(padding),
+			botRigt: focus.add(d).add(padding),
 			pushFocus: function() {
 				this.topLeft = focus.sub(d).sub(padding);
-				this.botRigt = focus.add(d);
+				this.botRigt = focus.add(d).add(padding);
 			}
 		}
 
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
 
-		keyLeft.press = moveScreenByPoint(new CE.Point(-5, 0));
-		keyRight.press = moveScreenByPoint(new CE.Point(5, 0));
-		keyUp.press = moveScreenByPoint(new CE.Point(0, -5));
-		keyDown.press = moveScreenByPoint(new CE.Point(0, 5));
+		keyLeft.press = keyRight.release = moveScreenByPoint(new CE.Point(-5, 0));
+		keyRight.press = keyLeft.release = moveScreenByPoint(new CE.Point(5, 0));
+		keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -5));
+		keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, 5));
 
 		function moveScreenByPoint(point) {
 			return () => {
-				focus = focus.add(point);
-				boundsOnMapInPixels.pushFocus();
-				updRenderingBounds(point);
+				focusVelocity = focusVelocity.add(point);
 			}
 		}
 	};
@@ -236,6 +238,13 @@ function fillSpriteContainer(i, j) {
 
 //TODO: Event handling
 //Second - cell click
+
+function velocityTick() {
+	focus = focus.add(focusVelocity);
+	boundsOnMapInPixels.pushFocus();
+	updRenderingBounds(focusVelocity);
+}
+setInterval(velocityTick, 15);
 
 function updRenderingBounds(delta) {
 
