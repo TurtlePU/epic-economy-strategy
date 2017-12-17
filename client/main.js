@@ -118,6 +118,8 @@ function keyboard(keyCode) {
 	return key;
 }
 
+var tick = false, targetFocusCountDown = 0;
+
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
 
@@ -148,7 +150,7 @@ socket.on('gameDataSend', function(gameData) {
 				this.topLeft = focus.sub(d).sub(padding);
 				this.botRigt = focus.add(d).add(padding);
 			}
-		}
+		};
 
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
@@ -159,11 +161,21 @@ socket.on('gameDataSend', function(gameData) {
 		keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -step));
 		keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, step));
 
+		stage.interactive = true;
+		stage.on('mousedown', (event) => {
+			var relativePoint = event.data.getLocalPosition(stage);
+			var goodPoint = new CE.Point(relativePoint.x, relativePoint.y)
+							.toOffset().toPoint();
+			let div = 4;
+			focusVelocity = new CE.Point((goodPoint.getX() - focus.getX()) / div, (goodPoint.getY() - focus.getY()) / div);
+			targetFocusCountDown = div;
+		}, {passive: true});
+
 		function moveScreenByPoint(point) {
 			return () => {
 				focusVelocity = focusVelocity.add(point);
 			}
-		}
+		};
 	};
 	fillVarFromData();
 
@@ -180,6 +192,7 @@ socket.on('gameDataSend', function(gameData) {
 	};
 	fillSpriteArray();
 	console.log("sprite array filled");
+	tick = true;
 	updRenderingBounds(zeroPoint);
 });
 
@@ -191,7 +204,6 @@ socket.on('chunkUpdated', function(chunk) {
 });
 
 function fillSpriteContainer(i, j) {
-	//console.log(mapOfChunks[i][j].res);
 	if (chunkContainers[i][j] != undefined)
 		stage.removeChild(chunkContainers[i][j]);
 	chunkContainers[i][j] = new PIXI.Container();
@@ -238,12 +250,19 @@ function fillSpriteContainer(i, j) {
 };
 
 //TODO: Event handling
-//Second - cell click
+//Third - know why after click arrows slow down
 
 function velocityTick() {
-	focus = focus.add(focusVelocity);
-	boundsOnMapInPixels.pushFocus();
-	updRenderingBounds(focusVelocity);
+	if (tick) {
+		focus = focus.add(focusVelocity);
+		boundsOnMapInPixels.pushFocus();
+		updRenderingBounds(focusVelocity);
+		if (targetFocusCountDown) {
+			--targetFocusCountDown;
+			if (!targetFocusCountDown)
+				focusVelocity = zeroPoint;
+		}
+	}
 }
 setInterval(velocityTick, 2);
 
