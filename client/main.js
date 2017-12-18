@@ -25,6 +25,11 @@ var gameCycle = {
 
 var cellSideSizeInPixels;
 
+function resizeRenderer() {
+	gl.autoResize = true;
+	gl.resize(window.innerWidth, window.innerHeight);
+};
+
 function start() {
 	function sayHello() {
 		var type = "WebGL";
@@ -35,12 +40,6 @@ function start() {
 	};
 	sayHello();
 	
-	function resizeRenderer() {
-		gl.view.style.position = "absolute";
-		gl.view.style.display = "block";
-		gl.autoResize = true;
-		gl.resize(window.innerWidth, window.innerHeight);
-	};
 	resizeRenderer();
 	document.body.appendChild(gl.view);
 	
@@ -119,6 +118,7 @@ function keyboard(keyCode) {
 }
 
 var tick = false, targetFocusCountDown = 0;
+var lastTargetFocus;
 
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
@@ -167,7 +167,7 @@ socket.on('gameDataSend', function(gameData) {
 			var goodPoint = new CE.Point(relativePoint.x, relativePoint.y)
 							.toOffset().toPoint();
 			let div = 4;
-			focusVelocity = new CE.Point((goodPoint.getX() - focus.getX()) / div, (goodPoint.getY() - focus.getY()) / div);
+			focusVelocity = focusVelocity.add(lastTargetFocus = new CE.Point((goodPoint.getX() - focus.getX()) / div, (goodPoint.getY() - focus.getY()) / div));
 			targetFocusCountDown = div;
 		}, {passive: true});
 
@@ -254,15 +254,17 @@ function fillSpriteContainer(i, j) {
 
 function velocityTick() {
 	if (tick) {
+		console.log(focusVelocity.getX() + " " + focusVelocity.getY());
 		focus = focus.add(focusVelocity);
 		boundsOnMapInPixels.pushFocus();
 		updRenderingBounds(focusVelocity);
 		if (targetFocusCountDown) {
 			--targetFocusCountDown;
 			if (!targetFocusCountDown)
-				focusVelocity = zeroPoint;
+				focusVelocity = focusVelocity.sub(lastTargetFocus);
 		}
 	}
+	resizeRenderer();
 }
 setInterval(velocityTick, 2);
 
