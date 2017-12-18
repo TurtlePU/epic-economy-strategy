@@ -12,19 +12,15 @@ app.get('/', function(req, res) {
 app.use('/client', express.static(__dirname + '/client'));
 
 var mapData;
-fs.readFile('./res/map-table.csv', function(err, data) {
-	mapData = Papa.parse(data, {
-		complete: function(result) {
-			console.log("Parsed map data: " + result.data);
-		}
-	});
-});
 var dataLoaded = false;
-var buiData;
-fs.readFile('./res/buildings-table.csv', function(err, data) {
-	buiData = Papa.parse(data, {
+var td = fs.readFile('./res/map-table.csv', 'utf-8', function(err, data) {
+	if (err) throw err;
+	console.log(data);
+	mapData = Papa.parse(data, {
+		header: true, 
+		dynamicTyping: true,
 		complete: function(result) {
-			console.log("Parsed buildings data: " + result.data);
+			console.log("Parsed map data: " + JSON.stringify(result));
 			dataLoaded = true;
 		}
 	});
