@@ -11,18 +11,20 @@ app.get('/', function(req, res) {
 });
 app.use('/client', express.static(__dirname + '/client'));
 
-var mapData;
 var dataLoaded = false;
-var td = fs.readFile('./res/map-table.csv', 'utf-8', function(err, data) {
+var mapData;
+fs.readFile('./res/map-table.csv', 'utf-8', function(err, data) {
 	if (err) throw err;
-	console.log(data);
 	mapData = Papa.parse(data, {
 		header: true, 
 		dynamicTyping: true,
 		complete: function(result) {
-			console.log("Parsed map data: " + JSON.stringify(result));
 			dataLoaded = true;
 		}
+	}).data;
+	mapData.forEach(function(elem, index, array) {
+		if (!elem) return;
+		elem.richness /= 100;
 	});
 });
 
@@ -98,25 +100,20 @@ function next_player() {
 	return field_list[result].get_next();
 }
 
+var counter = 0;
 function next_map() {
 	//will be different
-	return {
-		a: 120,
-		b: 15,
-		c: 16,
-		mod: 228,
-		seed: 0,
-		logSize: 10,
-		height: 1,
-		prob_a: 69069, 
-		prob_b: 0,
-		prob_c: 15,
-		prob_mod: 1 << 30,
-		prob_seed: 179,
-		richness: 0.7,
-		chunkWidth: 3,
-		chunkHeight: 3
-	};
+	if (counter == mapData.length)
+		counter = 0;
+
+	while (!mapData[counter].a) {
+		++counter;
+		if (counter == mapData.length)
+			counter = 0;
+	}
+
+	console.log(mapData[counter]);
+	return mapData[counter++];
 };
 
 server.listen(4000);
