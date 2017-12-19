@@ -138,6 +138,8 @@ socket.on('gameDataSend', function(gameData) {
 		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
+		//TODO: fix rescale
+
 		focus = homeCell.toPoint();
 		focusVelocity = zeroPoint;
 		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
@@ -167,6 +169,7 @@ socket.on('gameDataSend', function(gameData) {
 					.toOffset().toPoint();
 			updRenderingBounds(newFocus.sub(focus));
 			focus = newFocus;
+			//TODO: show choice menu
 		}, {passive: true});
 
 		function moveScreenByPoint(point) {
@@ -192,6 +195,7 @@ socket.on('gameDataSend', function(gameData) {
 	console.log("sprite array filled");
 	tick = true;
 	updRenderingBounds(zeroPoint);
+	//TODO: show resources overlay
 });
 
 socket.on('chunkUpdated', function(chunk) {
@@ -248,7 +252,9 @@ function fillSpriteContainer(i, j) {
 };
 
 //TODO: Event handling
-//Third - know why after click arrows slow down
+//4th - building choice
+
+//TODO: Fix map scaling
 
 function velocityTick() {
 	if (tick) {
