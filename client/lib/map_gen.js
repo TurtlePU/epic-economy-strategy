@@ -1,4 +1,4 @@
-var PseudoRandom  = function(a, b, c, mod, elem) {
+var PseudoRandom = function(a, b, c, mod, elem) {
 	var prev = 0;
 	this.getNext = function() {
 		var t = (a * elem + b * prev + c) % mod;
@@ -150,4 +150,4 @@ var MapGen = {
 
 module.exports = {
 	MapGen: MapGen
-}
+};
