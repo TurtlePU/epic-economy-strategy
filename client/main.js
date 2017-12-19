@@ -117,8 +117,7 @@ function keyboard(keyCode) {
 	return key;
 }
 
-var tick = false, targetFocusCountDown = 0;
-var lastTargetFocus;
+var tick = false;
 
 socket.on('gameDataSend', function(gameData) {
 	console.log("game data send");
@@ -164,11 +163,10 @@ socket.on('gameDataSend', function(gameData) {
 		stage.interactive = true;
 		stage.on('mousedown', (event) => {
 			var relativePoint = event.data.getLocalPosition(stage);
-			var goodPoint = new CE.Point(relativePoint.x, relativePoint.y)
-							.toOffset().toPoint();
-			let div = 4;
-			focusVelocity = focusVelocity.add(lastTargetFocus = new CE.Point((goodPoint.getX() - focus.getX()) / div, (goodPoint.getY() - focus.getY()) / div));
-			targetFocusCountDown = div;
+			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
+					.toOffset().toPoint();
+			updRenderingBounds(newFocus.sub(focus));
+			focus = newFocus;
 		}, {passive: true});
 
 		function moveScreenByPoint(point) {
@@ -254,15 +252,9 @@ function fillSpriteContainer(i, j) {
 
 function velocityTick() {
 	if (tick) {
-		console.log(focusVelocity.getX() + " " + focusVelocity.getY());
 		focus = focus.add(focusVelocity);
 		boundsOnMapInPixels.pushFocus();
 		updRenderingBounds(focusVelocity);
-		if (targetFocusCountDown) {
-			--targetFocusCountDown;
-			if (!targetFocusCountDown)
-				focusVelocity = focusVelocity.sub(lastTargetFocus);
-		}
 	}
 	resizeRenderer();
 }
