@@ -28,23 +28,20 @@ fs.readFile('./res/map-table.csv', 'utf-8', (err, data) => {
 
 //player_id stores socket.ids
 var player_list = [];
-var Player = function(
-	player_id,
-	spawn_point
-) {
-	this.getId = function() {return player_id;};
-	this.getSpawn = function() {return spawn_point;};
+function Player(player_id, spawn_point) {
+	this.getId = () => player_id;
+	this.getSpawn = () => spawn_point;
 };
 
 //field.players stores indexes in player_list
 var field_list = [];
 
 io.sockets.on('connection', (socket) => {
-	console.log("socket connected");
+	console.log(`socket ${socket.id} connected`);
 	if (dataLoaded) {
 		var indexPlayer, indexField, indexOfMap;
 		socket.on('new_player', (data) => {
-			console.log("new player " + data.id);
+			console.log(`new player ${data.id}`);
 			var spawn = next_player();
 			var new_player = new Player(
 				data.id, spawn
@@ -55,25 +52,27 @@ io.sockets.on('connection', (socket) => {
 			socket.emit('gameDataSend', spawn);
 		});
 		socket.on('chunkSend', (chunk) => {
-			console.log(`chunk ${chunk} updated, sent by ${socket.id}`);
+			console.log(`chunk updated on map ${indexOfMap}: ${chunk}`);
 			field_list[indexOfMap].emit_chunk(chunk);
 		});
 		socket.on('disconnect', () => {
-			console.log(`player ${socket.id} disconnected`);
+			if (indexPlayer === undefined) return;
+			console.log(`player ${socket.id} (map ${indexOfMap}, position ${indexField}) disconnected`);
 			field_list[indexOfMap].remove_player(indexField);
 			player_list.splice(indexPlayer, 1);
 		});
 	}
-	//another events
 });
 
 const MAX_PLAYERS = 2;
 
 function Field(params, index) {
 	var filled = false,
+		hasPlace = true,
 		map = map_gen.buildChunked(params),
 		players = [];
-	this.getFilled = () => filled;
+	this.canTake = () => !filled && hasPlace;
+	this.getIndex = () => index;
 	this.emit_chunk = (chunk) => {
 		map[chunk.x][chunk.y] = chunk;
 		players.forEach((elem) => io.to(player_list[elem].getId()).emit('chunkUpdated', chunk));
@@ -94,6 +93,7 @@ function Field(params, index) {
 		}
 	};
 	this.get_next = () => {
+		//will be different
 		return { 
 			homeCell: { 
 				row: 16, 
@@ -106,8 +106,8 @@ function Field(params, index) {
 };
 
 function next_player() {
-	var result = field_list.find((elem) => !elem.getFilled());
-	console.log(`it will be on map ${JSON.stringify(result)}`);
+	var result = field_list.find((elem) => elem.canTake());
+	console.log(`it will be on map ${result === undefined ? result : result.getIndex()}`);
 	if (!result) {
 		console.log('new map');
 		field_list.push(result = new Field(next_map(), field_list.length));
@@ -117,7 +117,6 @@ function next_player() {
 
 var counter = 0;
 function next_map() {
-	//will be different
 	if (counter == mapData.length)
 		counter = 0;
 	while (!mapData[counter].a) {
