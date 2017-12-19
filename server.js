@@ -1,33 +1,32 @@
-const express = require('express');
-const app = express();
-const server = require('http').Server(app);
-const io = require('socket.io')(server);
-const map_gen = require('./client/lib/map_gen').MapGen;
-const Papa = require('papaparse');
-const fs = require('fs');
+const map_gen = require('./client/lib/map_gen').MapGen,
+	  fs = require('fs'),
+	  Papa = require('papaparse');
 
-app.get('/', function(req, res) {
+const express = require('express'),
+	  app = express(),
+	  server = require('http').Server(app),
+	  io = require('socket.io')(server);
+
+app.get('/', (req, res) => {
 	res.sendFile(__dirname + '/index.html');
 });
 app.use('/client', express.static(__dirname + '/client'));
 
 var dataLoaded = false;
 var mapData;
-fs.readFile('./res/map-table.csv', 'utf-8', function(err, data) {
+fs.readFile('./res/map-table.csv', 'utf-8', (err, data) => {
 	if (err) throw err;
 	mapData = Papa.parse(data, {
 		header: true, 
 		dynamicTyping: true,
-		complete: function(result) {
+		complete: (result) => {
+			result.data.forEach((elem) => elem.richness /= 100);
 			dataLoaded = true;
 		}
 	}).data;
-	mapData.forEach(function(elem, index, array) {
-		if (!elem) return;
-		elem.richness /= 100;
-	});
 });
 
+//player_id stores socket.ids
 var player_list = [];
 var Player = function(
 	player_id,
@@ -37,81 +36,95 @@ var Player = function(
 	this.getSpawn = function() {return spawn_point;};
 };
 
+//field.players stores indexes in player_list
 var field_list = [];
 
-io.sockets.on('connection', function(socket) {
+io.sockets.on('connection', (socket) => {
 	console.log("socket connected");
 	if (dataLoaded) {
-		socket.on('new_player', function(data) {
-			console.log("new player");
+		var indexPlayer, indexField, indexOfMap;
+		socket.on('new_player', (data) => {
+			console.log("new player " + data.id);
 			var spawn = next_player();
-			field_list[spawn.i].push_player(data.id);
 			var new_player = new Player(
 				data.id, spawn
 				//another params
 			);
 			player_list.push(new_player);
+			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
 			socket.emit('gameDataSend', spawn);
 		});
-		socket.on('chunkSend', function(chunk) {
-			console.log("chunk updated send");
-			var mapID = player_list[player_list.find(function(elem, index, arr) {return elem.getId() == socket.id})].spawn.mapID;
-			field_list[mapID].map[chunk.i][chunk.j] = chunk;
-			field_list[mapID].players.forEach(function(elem, index, arr) {
-				io.to(elem.getId()).emit('chunkUpdated', chunk);
-			});
+		socket.on('chunkSend', (chunk) => {
+			console.log(`chunk ${chunk} updated, sent by ${socket.id}`);
+			field_list[indexOfMap].emit_chunk(chunk);
+		});
+		socket.on('disconnect', () => {
+			console.log(`player ${socket.id} disconnected`);
+			field_list[indexOfMap].remove_player(indexField);
+			player_list.splice(indexPlayer, 1);
 		});
 	}
 	//another events
 });
 
+const MAX_PLAYERS = 2;
+
+function Field(params, index) {
+	var filled = false,
+		map = map_gen.buildChunked(params),
+		players = [];
+	this.getFilled = () => filled;
+	this.emit_chunk = (chunk) => {
+		map[chunk.x][chunk.y] = chunk;
+		players.forEach((elem) => io.to(player_list[elem].getId()).emit('chunkUpdated', chunk));
+	};
+	this.push_player = (pl_id) => {
+		players.push(pl_id);
+		if (players.length >= MAX_PLAYERS) {
+			console.log(`map ${index} filled`);
+			filled = true;
+		}
+		return players.length - 1;
+	}; 
+	this.remove_player = (pl_index) => {
+		players.splice(pl_index, 1);
+		if (players.length < MAX_PLAYERS) {
+			console.log(`map ${index} can take in more players`);
+			filled = false;
+		}
+	};
+	this.get_next = () => {
+		return { 
+			homeCell: { 
+				row: 16, 
+				col: 16 
+			}, 
+			i: index, 
+			mapParams: params 
+		};
+	};
+};
+
 function next_player() {
-	//will be different
-	let result;
-	let found = field_list.some(function(item, index, array){
-		result = index;
-		return !item.filled;
-	});
-	if (!found) {
+	var result = field_list.find((elem) => !elem.getFilled());
+	console.log(`it will be on map ${JSON.stringify(result)}`);
+	if (!result) {
 		console.log('new map');
-		let i = field_list.length;
-		var params = next_map();
-		field_list.push({
-			filled: false,
-			map: [],
-			players: [],
-			push_player: function(index) { 
-				this.players.push(index); 
-			},
-			get_next: function() {
-				return { 
-					homeCell: { 
-						row: 16, 
-						col: 16 
-					}, 
-					i: i, 
-					mapParams: params 
-				}; 
-			}
-		});
-		field_list[i].map = map_gen.buildChunked(params);
-		result = i;
+		field_list.push(result = new Field(next_map(), field_list.length));
 	}
-	return field_list[result].get_next();
-}
+	return result.get_next();
+};
 
 var counter = 0;
 function next_map() {
 	//will be different
 	if (counter == mapData.length)
 		counter = 0;
-
 	while (!mapData[counter].a) {
 		++counter;
 		if (counter == mapData.length)
 			counter = 0;
 	}
-
 	console.log(mapData[counter]);
 	return mapData[counter++];
 };
