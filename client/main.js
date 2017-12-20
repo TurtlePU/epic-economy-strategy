@@ -26,7 +26,7 @@ var gameCycle = {
 var cellSideSizeInPixels;
 
 function resizeRenderer() {
-	gl.autoResize = true;
+	//gl.autoResize = true;
 	gl.resize(window.innerWidth, window.innerHeight);
 };
 
@@ -153,6 +153,15 @@ socket.on('gameDataSend', function(gameData) {
 			}
 		};
 
+		window.onresize = (event) => {
+			console.log('triggered');
+			var newfocus = boundsOnMapInPixels.topLeft.add(padding).add(d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2));
+			var delta = newfocus.sub(focus);
+			focus = newfocus;
+			boundsOnMapInPixels.pushFocus();
+			updRenderingBounds(delta);
+		};
+
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
 
@@ -261,6 +270,7 @@ function velocityTick() {
 		focus = focus.add(focusVelocity);
 		boundsOnMapInPixels.pushFocus();
 		updRenderingBounds(focusVelocity);
+		console.log(`${boundsOnMapInPixels.topLeft.getX()} ${boundsOnMapInPixels.topLeft.getY()} ${boundsOnMapInPixels.botRigt.getX()} ${boundsOnMapInPixels.botRigt.getY()}`);
 	}
 	resizeRenderer();
 }
