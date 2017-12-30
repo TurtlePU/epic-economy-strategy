@@ -12,12 +12,16 @@ function texture(path) {
 	return PIXI.loader.resources[path].texture;
 };
 
-const imagePathList = [
-	"client/bmp/cell_color0.png", 
-	"client/bmp/cell_color1.png", 
-	"client/bmp/cell_color2.png", 
-	"client/bmp/cell_color3.png"
-];
+function img(name) {
+	return `client/img/${name}.png`;
+}
+function buildImgPathList() {
+	var res = [];
+	for (let i = 0; i < 4; ++i)
+		res.push(img("cell_color" + i));
+	return res;
+}
+const imagePathList = buildImgPathList();
 
 var gameCycle = {
 	start: start
@@ -49,7 +53,7 @@ function start() {
 		//loader.progress - progress in %
 	};
 	function emitPlayer() {
-		cellSideSizeInPixels = new PIXI.Sprite(texture("client/bmp/cell_color0.png")).height / 2;
+		cellSideSizeInPixels = new PIXI.Sprite(texture(img("cell_color0"))).height / 2;
 		socket.emit('new_player', {
 			id: socket.id,
 			//maybe smth else
@@ -233,8 +237,8 @@ function fillSpriteContainer(i, j) {
 	function getPathsOfCellImage(x, y) {
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
 		return [
-			`client/bmp/cell_color${mapOfChunks[i][j].res[x][y]}.png`//,
-			//`client/bmp/building${mapOfChunks[i][j].bui[x][y]}.png`
+			img(`cell_color${mapOfChunks[i][j].res[x][y]}`)//,
+			//img(`building${mapOfChunks[i][j].bui[x][y]}`)
 		];
 	};
 
