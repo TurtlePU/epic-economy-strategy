@@ -26,7 +26,7 @@ var gameCycle = {
 var cellSideSizeInPixels;
 
 function resizeRenderer() {
-	//gl.autoResize = true;
+	gl.autoResize = true;
 	gl.resize(window.innerWidth, window.innerHeight);
 };
 
@@ -148,8 +148,6 @@ socket.on('gameDataSend', function(gameData) {
 
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
-		//TODO: fix rescale
-
 		focus = homeCell.toPoint();
 		focusVelocity = zeroPoint;
 		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
@@ -164,14 +162,10 @@ socket.on('gameDataSend', function(gameData) {
 		};
 
 		window.addEventListener("resize", (event) => {
-			console.log('triggered');
-			tick = false;
-			var newfocus = boundsOnMapInPixels.topLeft.add(d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2));
-			var delta = newfocus.sub(focus);
-			focus = newfocus;
-			boundsOnMapInPixels.pushFocus();
-			updRenderingBounds(delta);
-			tick = true;
+			d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+			focus = boundsOnMapInPixels.topLeft.add(d);
+			stage.x = -focus.getX() + d.getX();
+			stage.y = -focus.getY() + d.getY();
 		}, false);
 
 		stage.x = -focus.getX() + d.getX();
@@ -186,10 +180,9 @@ socket.on('gameDataSend', function(gameData) {
 		stage.interactive = true;
 		stage.on('mousedown', (event) => {
 			var relativePoint = event.data.getLocalPosition(stage);
-			var offset;
-			var newFocus = (offset = new CE.Point(relativePoint.x, relativePoint.y).toOffset())
+			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
+							.toOffset()
 							.toPoint();
-			console.log(JSON.stringify(offset));
 			updRenderingBounds(newFocus.sub(focus));
 			focus = newFocus;
 			//TODO: show choice menu
@@ -240,8 +233,8 @@ function fillSpriteContainer(i, j) {
 	function getPathsOfCellImage(x, y) {
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
 		return [
-			"client/bmp/cell_color" + mapOfChunks[i][j].res[x][y] + ".png"//,
-			//"client/bmp/building" + mapOfChunks[i][j].bui[x][y] + ".png"
+			`client/bmp/cell_color${mapOfChunks[i][j].res[x][y]}.png`//,
+			//`client/bmp/building${mapOfChunks[i][j].bui[x][y]}.png`
 		];
 	};
 
@@ -277,8 +270,6 @@ function fillSpriteContainer(i, j) {
 //TODO: Event handling
 //4th - building choice
 
-//TODO: Fix map scaling
-
 function velocityTick() {
 	if (tick) {
 		focus = focus.add(focusVelocity);
@@ -299,15 +290,15 @@ function updRenderingBounds(delta) {
 	};
 	let bounds = getRenderingBounds();
 	
-	let x1 = lastBounds.x1,
-		x2 = lastBounds.x2,
-		y1 = lastBounds.y1,
-		y2 = lastBounds.y2,
+	let x1 = lastBounds.x1 - 1,
+		x2 = lastBounds.x2 + 1,
+		y1 = lastBounds.y1 - 1,
+		y2 = lastBounds.y2 + 1,
 
-		tx1 = bounds.x1,
-		tx2 = bounds.x2,
-		ty1 = bounds.y1,
-		ty2 = bounds.y2;
+		tx1 = bounds.x1 - 1,
+		tx2 = bounds.x2 + 1,
+		ty1 = bounds.y1 - 1,
+		ty2 = bounds.y2 + 1;
 
 	function setChunksVisible(x1, x2, y1, y2, value) {
 		if (x1 > x2 || y1 > y2) return;
@@ -320,27 +311,8 @@ function updRenderingBounds(delta) {
 		}
 	};
 
-	with(Math) {
-		setChunksVisible(x1, min(x2, tx1 - 1), y1, min(y2, ty1 - 1), false);
-		setChunksVisible(max(x1, tx1), min(x2, tx2), y1, min(y2, ty1 - 1), false);
-		setChunksVisible(max(x1, tx2 + 1), x2, y1, min(y2, ty1 - 1), false);
-		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty1), min(y2, ty2), false);
-		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty1), min(y2, ty2), false);
-		setChunksVisible(x1, min(x2, tx1 - 1), max(y1, ty2 + 1), y2, false);
-		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty2 + 1), y2, false);
-		setChunksVisible(max(x1, tx2 + 1), x2, max(y1, ty2 + 1), y2, false);
-
-		setChunksVisible(tx1, min(tx2, x1 - 1), ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(max(tx1, x1), min(tx2, x2), ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, ty1, min(ty2, y1 - 1), true);
-		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y1), min(ty2, y2), true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y1), min(ty2, y2), true);
-		setChunksVisible(tx1, min(tx2, x1 - 1), max(ty1, y2 + 1), ty2, true);
-		setChunksVisible(max(tx1, x1), min(tx2, x2), max(ty1, y2 + 1), ty2, true);
-		setChunksVisible(max(tx1, x2 + 1), tx2, max(ty1, y2 + 1), ty2, true);
-
-		setChunksVisible(max(x1, tx1), min(x2, tx2), max(y1, ty1), min(y2, ty2), true);
-	}
+	setChunksVisible(x1, x2, y1, y2, false);
+	setChunksVisible(tx1, tx2, ty1, ty2, true);
 
 	stage.x -= delta.getX();
 	stage.y -= delta.getY();
