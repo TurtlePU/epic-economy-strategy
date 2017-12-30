@@ -70,11 +70,13 @@ function Field(params, index) {
 	var filled = false,
 		hasPlace = true,
 		map = map_gen.buildChunked(params),
+		bui = [[]],
 		players = [];
 	this.canTake = () => !filled && hasPlace;
 	this.getIndex = () => index;
 	this.emit_chunk = (chunk) => {
 		map[chunk.x][chunk.y] = chunk;
+		bui[chunk.x][chunk.y] = chunk.bui;
 		players.forEach((elem) => io.to(player_list[elem].getId()).emit('chunkUpdated', chunk));
 	};
 	this.push_player = (pl_id) => {
@@ -100,7 +102,8 @@ function Field(params, index) {
 				col: 16 
 			}, 
 			i: index, 
-			mapParams: params 
+			mapParams: params,
+			buildings: bui
 		};
 	};
 };
