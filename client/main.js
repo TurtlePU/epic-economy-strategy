@@ -136,6 +136,16 @@ socket.on('gameDataSend', function(gameData) {
 		zeroPoint = new CE.Point(0, 0);
 
 		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
+		if (gameData.buildings.length) {
+			for (let i = 0; i < mapWidthInChunks; ++i) {
+				if (gameData.buildings[i] === undefined) continue;
+				for (let j = 0; j < mapHeightInChunks; ++j) {
+					if (gameData.buildings[i][j] === undefined) continue;
+					mapOfChunks[i][j].bui = gameData.buildings[i][j];
+				}
+			}
+		}
+
 		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
 		//TODO: fix rescale
@@ -145,22 +155,24 @@ socket.on('gameDataSend', function(gameData) {
 		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
 		padding = new CE.Point(cellSideSizeInPixels * chunkWidthInCells, cellSideSizeInPixels * chunkHeightInCells);
 		boundsOnMapInPixels = {
-			topLeft: focus.sub(d).sub(padding),
-			botRigt: focus.add(d).add(padding),
+			topLeft: focus.sub(d),
+			botRigt: focus.add(d),
 			pushFocus: function() {
-				this.topLeft = focus.sub(d).sub(padding);
-				this.botRigt = focus.add(d).add(padding);
+				this.topLeft = focus.sub(d);
+				this.botRigt = focus.add(d);
 			}
 		};
 
-		window.onresize = (event) => {
+		window.addEventListener("resize", (event) => {
 			console.log('triggered');
-			var newfocus = boundsOnMapInPixels.topLeft.add(padding).add(d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2));
+			tick = false;
+			var newfocus = boundsOnMapInPixels.topLeft.add(d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2));
 			var delta = newfocus.sub(focus);
 			focus = newfocus;
 			boundsOnMapInPixels.pushFocus();
 			updRenderingBounds(delta);
-		};
+			tick = true;
+		}, false);
 
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
@@ -174,8 +186,10 @@ socket.on('gameDataSend', function(gameData) {
 		stage.interactive = true;
 		stage.on('mousedown', (event) => {
 			var relativePoint = event.data.getLocalPosition(stage);
-			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
-					.toOffset().toPoint();
+			var offset;
+			var newFocus = (offset = new CE.Point(relativePoint.x, relativePoint.y).toOffset())
+							.toPoint();
+			console.log(JSON.stringify(offset));
 			updRenderingBounds(newFocus.sub(focus));
 			focus = newFocus;
 			//TODO: show choice menu
