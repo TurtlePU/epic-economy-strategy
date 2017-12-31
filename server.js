@@ -15,13 +15,18 @@ app.use('/client', express.static(__dirname + '/client'));
 var dataLoaded = false;
 var mapData;
 fs.readFile('./res/map-table.csv', 'utf-8', (err, data) => {
-	if (err) throw err;
+	if (err) {
+		console.log("error while reading file occured");
+		throw err;
+	}
+	console.log("map data succesfully read");
 	mapData = Papa.parse(data, {
 		header: true, 
 		dynamicTyping: true,
 		complete: (result) => {
 			result.data.forEach((elem) => elem.richness /= 100);
 			dataLoaded = true;
+			console.log("map data succesfully parsed");
 		}
 	}).data;
 });
