@@ -8,7 +8,7 @@ const express = require('express'),
 	  io = require('socket.io')(server);
 
 app.get('/', (req, res) => {
-	res.sendFile(__dirname + '/index.html');
+	res.sendFile(__dirname + '/client/index.html');
 });
 app.use('/client', express.static(__dirname + '/client'));
 
