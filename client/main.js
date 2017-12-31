@@ -13,7 +13,7 @@ function texture(path) {
 };
 
 function img(name) {
-	return `client/img/${name}.png`;
+	return `./client/img/${name}.png`;
 }
 function buildImgPathList() {
 	var res = [];
@@ -279,7 +279,6 @@ function velocityTick() {
 		focus = focus.add(focusVelocity);
 		boundsOnMapInPixels.pushFocus();
 		updRenderingBounds(focusVelocity);
-		console.log(`${boundsOnMapInPixels.topLeft.getX()} ${boundsOnMapInPixels.topLeft.getY()} ${boundsOnMapInPixels.botRigt.getX()} ${boundsOnMapInPixels.botRigt.getY()}`);
 	}
 	resizeRenderer();
 }
