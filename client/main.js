@@ -32,6 +32,7 @@ var cellSideSizeInPixels;
 function resizeRenderer() {
 	gl.autoResize = true;
 	gl.resize(window.innerWidth, window.innerHeight);
+	gl.backgroundColor = 0x000080;
 };
 
 function start() {
