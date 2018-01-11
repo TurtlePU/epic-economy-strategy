@@ -52,8 +52,13 @@ function start() {
 		//TODO: Progress bar
 		//loader.progress - progress in %
 	};
-	function emitPlayer() {
+	function onDataLoad() {
+		//overlay design
+		
+		content.addChild(overlay);
+		//
 		cellSideSizeInPixels = new PIXI.Sprite(texture(img("cell_color0"))).height / 2;
+		//emitting player
 		socket.emit('new_player', {
 			id: socket.id,
 			//maybe smth else
@@ -63,7 +68,7 @@ function start() {
 	PIXI.loader
 		.add(imagePathList)
 		.on("progress", showProgress)
-		.load(emitPlayer);
+		.load(onDataLoad);
 };
 
 var mapOfChunks = [[]];
