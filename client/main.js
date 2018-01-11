@@ -7,7 +7,7 @@ socket.on('connect', function() {
 
 //PIXI.js
 const gl = PIXI.autoDetectRenderer(256, 256);
-const content = new PIXI.Container(), stage = new PIXI.Container();
+const content = new PIXI.Container(), stage = new PIXI.Container(), overlay = new PIXI.Container();
 function texture(path) {
 	return PIXI.loader.resources[path].texture;
 };
@@ -32,7 +32,6 @@ var cellSideSizeInPixels;
 function resizeRenderer() {
 	gl.autoResize = true;
 	gl.resize(window.innerWidth, window.innerHeight);
-	gl.backgroundColor = 0x000080;
 };
 
 function start() {
