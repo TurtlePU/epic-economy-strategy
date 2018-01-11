@@ -39,7 +39,7 @@ function start() {
 	function sayHello() {
 		var type = "WebGL";
 		if (!PIXI.utils.isWebGLSupported()) {
-			type = canvas;
+			type = "canvas";
 		}
 		PIXI.utils.sayHello(type);
 	};
