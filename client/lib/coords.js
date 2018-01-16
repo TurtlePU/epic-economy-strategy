@@ -179,3 +179,7 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
         new Cube(-2, +1, +1), new Cube(-1, -1, +2), new Cube(+1, -2, +1)
     ];
 };
+
+module.exports = {
+    CoordsEnvironment: CoordsEnvironment
+};
