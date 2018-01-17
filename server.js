@@ -96,7 +96,7 @@ function parse(name) {
 			complete: (result) => {
 				if (result.data[0].richness) result.data.forEach((elem) => elem.richness /= 100);
 				++countLoads;
-				console.log("map data succesfully parsed");
+				console.log(`${name} succesfully parsed`);
 			}
 		}).data;
 	});
@@ -156,7 +156,7 @@ function Resources() {
 		B -= data.b;
 		return true;
 	};
-	this.toJSON = () => {r: R, g: G, b: B, m: M};
+	this.toJSON = () => {return {r: R, g: G, b: B, m: M};}
 	this.sum = () => R + G + B;
 }
 function Resources(maxCapacity) {
@@ -199,6 +199,15 @@ function Field(params, index) {
 		bui_to_send = [[]],
 		players = [],
 		CE = new coords(42, params.chunkWidth, params.chunkHeight);
+	for (let ci = 0; map[ci] !== undefined; ++ci) {
+		for (let cj = 0; map[ci][cj] !== undefined; ++cj) {
+			for (let i = 0; i < params.chunkWidth; ++i) {
+				for (let j = 0; j < params.chunkHeight; ++j) {
+					//TODO: fill bui with resources
+				}
+			}
+		}
+	}
 	this.canTake = () => !filled && hasPlace;
 	this.getIndex = () => index;
 	this.emit_chunk = (x, y) => {
@@ -233,7 +242,8 @@ function Field(params, index) {
 				tdx = neigh.getRow() % params.chunkWidth,
 				tdy = neigh.getCol() % params.chunkHeight,
 				other = bui[nech.getX()][nech.getY()][tdx][tdy];
-			if (other === undefined) continue;
+			if (other === undefined || (other.own >= 0 && other.own != data.owner)) continue;
+			//TODO: add resources to link table
 			if (precedes(data.value, other.val)) {
 				building.outputs.push(other.bui);
 				other.bui.neighbours.push(building);
