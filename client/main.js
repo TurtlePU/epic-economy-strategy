@@ -1,13 +1,103 @@
-//socket.io
-const socket = io.connect();
+/*
+TODO:
+1. Events:
+	emit - build(data)
+	* data:
+		option: resources(0) / money(1)
+		build:
+			cx: chunk x
+			cy: chunk y
+			dx: rel.offset row
+			dy: rel.offset col
+			value: index of building
+	
+	emit - upgrade_building(data)
+	* data:
+		option: resources(0) / money(1)
+		coords:
+			cx, cy, dx, dy
+	
+	emit - remove_building(data)
+	* data:
+		cx, cy, dx, dy
 
+	on - resources_updated(JSON)
+	* JSON:
+		r, g, b, m - total of resources
+		cap - capacity
+2. Events:
+	on - inside game_data_send
+	* table:
+		buildings-table parsed
+3. Graphics:
+	shown below
+4. Gameplay:
+	add mousedown for overlay which emits events form (1)
+*/
+
+const socket = io.connect();
 socket.on('connect', function() {
 	console.log("connect");
 });
 
-//PIXI.js
-const gl = PIXI.autoDetectRenderer(256, 256);
-const content = new PIXI.Container(), stage = new PIXI.Container(), overlay = new PIXI.Container();
+const gl = PIXI.autoDetectRenderer(256, 256),
+	  imagePathList = buildImgPathList();
+
+const gameCycle = {start: start};
+function start() {
+	sayHello();
+	resizeRenderer();
+	document.body.appendChild(gl.view);
+	PIXI.loader
+		.add(imagePathList)
+		.on("progress", showProgress)
+		.load(designOverlayAndEmitPlayer);
+};
+
+const content = new PIXI.Container(), 
+	  stage = new PIXI.Container(), 
+	  overlay = new PIXI.Container();
+
+var zeroPoint;
+var tick = false;
+
+socket.on('gameDataSend', function(gameData) {
+	console.log("game data send");
+	fillVarFromData(gameData);
+	fillSpriteArray();
+	content.addChild(stage);
+	gl.render(content);
+	updRenderingBounds(zeroPoint);
+	tick = true;
+});
+
+setInterval(velocityTick, 2);
+
+socket.on('chunkUpdated', function(chunk) {
+	console.log("chunk updated");
+	mapOfChunks[chunk.x][chunk.y] = chunk;
+	fillSpriteContainer(chunk.x, chunk.y);
+	updRenderingBounds(zeroPoint);
+});
+
+//--------------------------
+
+var mapOfChunks = [[]];
+var chunkContainers = [[]];
+var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
+
+var CE;
+
+var chunkWidthInCells, chunkHeightInCells;
+var homeCell;
+var boundsOnMapInPixels;
+var focus, focusVelocity;
+
+const keyLeft = keyboard(65), 
+	  keyRight = keyboard(68), 
+	  keyUp = keyboard(87), 
+	  keyDown = keyboard(83);
+
 function texture(path) {
 	return PIXI.loader.resources[path].texture;
 };
@@ -21,11 +111,6 @@ function buildImgPathList() {
 		res.push(img("cell_color" + i));
 	return res;
 }
-const imagePathList = buildImgPathList();
-
-var gameCycle = {
-	start: start
-};
 
 var cellSideSizeInPixels;
 
@@ -34,60 +119,28 @@ function resizeRenderer() {
 	gl.resize(window.innerWidth, window.innerHeight);
 };
 
-function start() {
-	function sayHello() {
-		var type = "WebGL";
-		if (!PIXI.utils.isWebGLSupported()) {
-			type = "canvas";
-		}
-		PIXI.utils.sayHello(type);
-	};
-	sayHello();
-	
-	resizeRenderer();
-	document.body.appendChild(gl.view);
-	
-	function showProgress(loader, resource) {
-		console.log("loading...");
-		//TODO: Progress bar
-		//loader.progress - progress in %
-	};
-	function onDataLoad() {
-		//overlay design
-		
-		content.addChild(overlay);
-		//
-		cellSideSizeInPixels = new PIXI.Sprite(texture(img("cell_color0"))).height / 2;
-		//emitting player
-		socket.emit('new_player', {
-			id: socket.id,
-			//maybe smth else
-		});
-	};
-
-	PIXI.loader
-		.add(imagePathList)
-		.on("progress", showProgress)
-		.load(onDataLoad);
+function sayHello() {
+	var type = "WebGL";
+	if (!PIXI.utils.isWebGLSupported()) {
+		type = "canvas";
+	}
+	PIXI.utils.sayHello(type);
 };
 
-var mapOfChunks = [[]];
-var chunkContainers = [[]];
-var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
-
-var CE;
-var zeroPoint;
-
-var chunkWidthInCells, chunkHeightInCells;
-var homeCell;
-var boundsOnMapInPixels;
-var focus, focusVelocity;
-
-const 
-keyLeft = keyboard(65), 
-keyRight = keyboard(68), 
-keyUp = keyboard(87), 
-keyDown = keyboard(83);
+function showProgress(loader, resource) {
+	console.log("loading...");
+	//TODO: Progress bar
+	//loader.progress - progress in %
+};
+function designOverlayAndEmitPlayer() {
+	content.addChild(overlay);
+	//TODO: overlay design
+	cellSideSizeInPixels = new PIXI.Sprite(texture(img("cell_color0"))).height / 2;
+	socket.emit('new_player', {
+		id: socket.id,
+		//maybe smth else
+	});
+};
 
 var lastBounds;
 
@@ -126,109 +179,88 @@ function keyboard(keyCode) {
 	return key;
 }
 
-var tick = false;
+function fillVarFromData(gameData) {
+	mapSizeInCells = (1 << gameData.mapParams.logSize) + 1;
+	chunkWidthInCells = gameData.mapParams.chunkWidth;
+	chunkHeightInCells = gameData.mapParams.chunkHeight;
 
-socket.on('gameDataSend', function(gameData) {
-	console.log("game data send");
+	mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
+	mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
 
-	function fillVarFromData() {
-		mapSizeInCells = (1 << gameData.mapParams.logSize) + 1;
-		chunkWidthInCells = gameData.mapParams.chunkWidth;
-		chunkHeightInCells = gameData.mapParams.chunkHeight;
+	lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks - 1, y2: mapHeightInChunks - 1};
 
-		mapWidthInChunks = Math.ceil(mapSizeInCells / chunkWidthInCells);
-		mapHeightInChunks = Math.ceil(mapSizeInCells / chunkHeightInCells);
+	CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
+	zeroPoint = new CE.Point(0, 0);
 
-		lastBounds = {x1: 0, y1: 0, x2: mapWidthInChunks - 1, y2: mapHeightInChunks - 1};
-
-		CE = new CoordsEnvironment(cellSideSizeInPixels, chunkWidthInCells, chunkHeightInCells);
-		zeroPoint = new CE.Point(0, 0);
-
-		mapOfChunks = MapGen.buildChunked(gameData.mapParams);
-		if (gameData.buildings.length) {
-			for (let i = 0; i < mapWidthInChunks; ++i) {
-				if (gameData.buildings[i] === undefined) continue;
-				for (let j = 0; j < mapHeightInChunks; ++j) {
-					if (gameData.buildings[i][j] === undefined) continue;
-					mapOfChunks[i][j].bui = gameData.buildings[i][j];
-				}
+	mapOfChunks = MapGen.buildChunked(gameData.mapParams);
+	if (gameData.buildings.length) {
+		for (let i = 0; i < mapWidthInChunks; ++i) {
+			if (gameData.buildings[i] === undefined) continue;
+			for (let j = 0; j < mapHeightInChunks; ++j) {
+				if (gameData.buildings[i][j] === undefined) continue;
+				mapOfChunks[i][j].bui = gameData.buildings[i][j];
 			}
 		}
+	}
 
-		homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
+	homeCell = new CE.Offset(gameData.homeCell.row, gameData.homeCell.col);
 
-		focus = homeCell.toPoint();
-		focusVelocity = zeroPoint;
-		let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
-		padding = new CE.Point(cellSideSizeInPixels * chunkWidthInCells, cellSideSizeInPixels * chunkHeightInCells);
-		boundsOnMapInPixels = {
-			topLeft: focus.sub(d),
-			botRigt: focus.add(d),
-			pushFocus: function() {
-				this.topLeft = focus.sub(d);
-				this.botRigt = focus.add(d);
-			}
-		};
+	focus = homeCell.toPoint();
+	focusVelocity = zeroPoint;
+	let d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2), 
+	padding = new CE.Point(cellSideSizeInPixels * chunkWidthInCells, cellSideSizeInPixels * chunkHeightInCells);
+	boundsOnMapInPixels = {
+		topLeft: focus.sub(d),
+		botRigt: focus.add(d),
+		pushFocus: function() {
+			this.topLeft = focus.sub(d);
+			this.botRigt = focus.add(d);
+		}
+	};
 
-		window.addEventListener("resize", (event) => {
-			d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
-			focus = boundsOnMapInPixels.topLeft.add(d);
-			stage.x = -focus.getX() + d.getX();
-			stage.y = -focus.getY() + d.getY();
-		}, false);
-
+	window.addEventListener("resize", (event) => {
+		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		focus = boundsOnMapInPixels.topLeft.add(d);
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
+	}, false);
 
-		var step = 3;
-		keyLeft.press = keyRight.release = moveScreenByPoint(new CE.Point(-step, 0));
-		keyRight.press = keyLeft.release = moveScreenByPoint(new CE.Point(step, 0));
-		keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -step));
-		keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, step));
+	stage.x = -focus.getX() + d.getX();
+	stage.y = -focus.getY() + d.getY();
 
-		stage.interactive = true;
-		stage.on('mousedown', (event) => {
-			var relativePoint = event.data.getLocalPosition(stage);
-			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
-							.toOffset()
-							.toPoint();
-			updRenderingBounds(newFocus.sub(focus));
-			focus = newFocus;
-			//TODO: show choice menu
-		}, {passive: true});
+	var step = 3;
+	keyLeft.press = keyRight.release = moveScreenByPoint(new CE.Point(-step, 0));
+	keyRight.press = keyLeft.release = moveScreenByPoint(new CE.Point(step, 0));
+	keyUp.press = keyDown.release = moveScreenByPoint(new CE.Point(0, -step));
+	keyDown.press = keyUp.release = moveScreenByPoint(new CE.Point(0, step));
 
-		function moveScreenByPoint(point) {
-			return () => {
-				focusVelocity = focusVelocity.add(point);
-			}
-		};
-	};
-	fillVarFromData();
+	stage.interactive = true;
+	stage.on('mousedown', (event) => {
+		var relativePoint = event.data.getLocalPosition(stage);
+		var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
+						.toOffset()
+						.toPoint();
+		updRenderingBounds(newFocus.sub(focus));
+		focus = newFocus;
+		//TODO: show choice menu
+	}, {passive: true});
 
-	content.addChild(stage);
-	gl.render(content);
-
-	function fillSpriteArray() {
-		for (let i = 0; i < mapWidthInChunks; ++i) {
-			chunkContainers[i] = [];
-			for (let j = 0; j < mapHeightInChunks; ++j) {
-				fillSpriteContainer(i, j);
-			}
+	function moveScreenByPoint(point) {
+		return () => {
+			focusVelocity = focusVelocity.add(point);
 		}
 	};
-	fillSpriteArray();
-	console.log("sprite array filled");
-	tick = true;
-	updRenderingBounds(zeroPoint);
-	//TODO: show resources overlay
-});
+};
 
-socket.on('chunkUpdated', function(chunk) {
-	console.log("chunk updated");
-	mapOfChunks[chunk.x][chunk.y] = chunk;
-	fillSpriteContainer(chunk.x, chunk.y);
-	updRenderingBounds(zeroPoint);
-});
+function fillSpriteArray() {
+	for (let i = 0; i < mapWidthInChunks; ++i) {
+		chunkContainers[i] = [];
+		for (let j = 0; j < mapHeightInChunks; ++j) {
+			fillSpriteContainer(i, j);
+		}
+	}
+	console.log("sprite array filled");
+};
 
 function fillSpriteContainer(i, j) {
 	if (chunkContainers[i][j] != undefined)
@@ -276,9 +308,6 @@ function fillSpriteContainer(i, j) {
 	stage.addChild(chunkContainers[i][j]);
 };
 
-//TODO: Event handling
-//4th - building choice
-
 function velocityTick() {
 	if (tick) {
 		focus = focus.add(focusVelocity);
@@ -287,7 +316,6 @@ function velocityTick() {
 	}
 	resizeRenderer();
 }
-setInterval(velocityTick, 2);
 
 function updRenderingBounds(delta) {
 
