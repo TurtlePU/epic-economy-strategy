@@ -12,11 +12,12 @@ app.get('/', (req, res) => {
 	res.sendFile(__dirname + '/index.html');
 });
 app.use('/client', express.static(__dirname + '/client'));
-//TODO: make link table
+
 const mapData = parse('map-table'), 
 	  resData = parse('player-table'), 
 	  buiData = parse('buildings-table'),
 	  linkData = parse('link-table');
+const building_replica = [];
 
 var countLoads = 0;
 const numberOfParses = 3;
@@ -27,6 +28,7 @@ var field_list = [],
 io.sockets.on('connection', (socket) => {
 	console.log(`socket ${socket.id} connected`);
 	if (countLoads == numberOfParses) {
+		if (!building_replica.length) build_replicas();
 		var indexPlayer, indexField, indexOfMap;
 		socket.on('new_player', (data) => {
 			console.log(`new player ${data.id}`);
@@ -37,22 +39,23 @@ io.sockets.on('connection', (socket) => {
 			);
 			player_list.push(new_player);
 			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
+			spawn.table = buiData;
 			socket.emit('gameDataSend', spawn);
 		});
 		socket.on('build', (data) => {
 			if (!(
 				(field_list[indexOfMap].reaches(indexField, data.build) || player_list[indexPlayer].buildings == 0) && 
 				field_list[indexOfMap].empty(data.build) && 
-				player_list[indexPlayer].tryChangeRes(getBuildCost(data.value), data.option)
+				player_list[indexPlayer].tryChangeRes(getBuildCost(data.build.value), data.option)
 				)) return;
 			data.build.owner = indexField;
 			field_list[indexOfMap].place_building(data.build);
 			++player_list[indexPlayer].buildings;
 		});
-		socket.on('upgrade_building', (coords) => {
+		socket.on('upgrade_building', (data) => {
 			if(!(
-				field_list[indexOfMap].owns(indexField, coords) &&
-				player_list[indexPlayer].tryChangeRes(field_list[indexOfMap].getUpgradeCost(coords), option)
+				field_list[indexOfMap].owns(indexField, data.coords) &&
+				player_list[indexPlayer].tryChangeRes(field_list[indexOfMap].getUpgradeCost(data.coords), data.option)
 				)) return;
 			field_list[indexOfMap].upgrade(data.coords);
 		});
@@ -92,7 +95,6 @@ function parse(name) {
 			dynamicTyping: true,
 			complete: (result) => {
 				if (result.data[0].richness) result.data.forEach((elem) => elem.richness /= 100);
-				if (result.data[0].func) build_replicas();
 				++countLoads;
 				console.log("map data succesfully parsed");
 			}
@@ -118,7 +120,10 @@ function Player(player_id, spawn_point) {
 	var res = new Resources();
 	this.tryChangeRes = (data, option) => {
 		var ans = res.tryChange(data, option);
-		if (ans) io.to(player_id).emit('resources_updated', res.toJSON());
+		if (ans) {
+			io.to(player_id).emit('resources_updated', res.toJSON());
+			//TODO: substract from storages
+		}
 		return ans;
 	};
 	this.buildings = 0;
@@ -156,12 +161,14 @@ function Resources() {
 }
 function Resources(maxCapacity) {
 	var R = 0, G = 0, B = 0;
-	this.tryChange = (amount, type) => {
-		let d = Math.min(amount, maxCapacity - R - G - B);
-		if (type == 0) R += d;
-		if (type == 1) G += d;
-		if (type == 2) B += d;
-		return d;
+	this.tryChange = (delta) => {
+		let dr = Math.min(delta.r, maxCapacity - R - G - B);
+		R += dr;
+		let dg = Math.min(delta.g, maxCapacity - R - G - B);
+		G += dg;
+		let db = Math.min(delta.b, maxCapacity - R - G - B);
+		B += db;
+		return {r: dr, g: dg, b: db};
 	}
 }
 
@@ -183,6 +190,7 @@ function precedes(fat, son) {
 };
 
 const MAX_PLAYERS = 2, msPerTick = 1000;
+
 function Field(params, index) {
 	var filled = false,
 		hasPlace = true,
@@ -203,7 +211,8 @@ function Field(params, index) {
 			filled = true;
 		}
 		return players.length - 1;
-	}; 
+	};
+	this.getPlayer = (index) => players[index]; 
 	this.empty = (coords) => {
 		var chunk = map[coords.cx][coords.cy];
 		return chunk.bui[coords.dx][coords.dy] == 0 && chunk.res[coords.dx][coords.dy] == 0;
@@ -215,25 +224,8 @@ function Field(params, index) {
 	this.place_building = sync((data) => {
 		map[data.cx][data.cy].bui[data.dx][data.dy] = bui_to_send[data.cx][data.cy][data.dx][data.dy] = data.value + "_" + data.owner;
 		
-		var building = makeBuilding(data.value, data.owner);
-		if (building.getCapacity() != 0) {
-			building.vessel = new Resources(0, 0, 0, 0, building.getCapacity());
-			building.call = () => {
-				let dr = 0, dg = 0, db = 0;
-				neighbours.forEach((elem) => {
-					//TODO: make map type of building ->> type of resource
-					let type = resType[elem.type], d = 0;
-					d = vessel.tryChange(elem.product, type);
-					if (type == 0) dr += d;
-					if (type == 1) dg += d;
-					if (type == 2) db += d;
-					elem.product -= d;
-				});
-				player_list[players[data.owner]].tryChangeRes({r: dr, g: dg, b: db});
-			};
-		}
-		//TODO: same about sellers
-
+		var building = makeBuilding(data.value, data.owner, index);
+		
 		var offset = new CE.Offset(data.cx * params.chunkWidth + data.dx, data.cy * params.chunkHeight + data.dy);
 		for (let i = 0; i < 6; ++i) {
 			var neigh = offset.getNeighbour(i),
@@ -259,16 +251,16 @@ function Field(params, index) {
 			clb: setInterval(building.call, building.getTime() * msPerTick)
 		};
 		
-		emit_chunk(data.cx, data.cy);
+		this.emit_chunk(data.cx, data.cy);
 	});
-	this.owns = (player, coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].own == player;
+	this.owns = (player, coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy] && bui[coords.cx][coords.cy][coords.dx][coords.dy].own == player;
 	this.getValue = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].val;
 	this.getUpgradeCost = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].bui.getUpgradeCost();
 	this.upgrade = (coords) => {
 		var cell = bui[coords.cx][coords.cy][coords.dx][coords.dy];
 		removeInterval(cell.clb);
 		cell.bui.upgrade();
-		cell.clb = setInterval(building.call, building.getTime() * msPerTick);
+		cell.clb = setInterval(cell.bui.call, cell.bui.getTime() * msPerTick);
 	};
 	this.remove_building = (crd) => {
 		var cell = bui[crd.cx][crd.cy][crd.dx][crd.dy];
@@ -285,7 +277,7 @@ function Field(params, index) {
 		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
 		map[crd.cx][crd.cy].bui[crd.dx][crd.dy] = bui_to_send[crd.cx][crd.cy][crd.dx][crd.dy] = 0;
 		
-		emit_chunk(crd.cx, crd.cy);
+		this.emit_chunk(crd.cx, crd.cy);
 	};
 	this.remove_player = (pl_index) => {
 		players.splice(pl_index, 1);
@@ -308,7 +300,6 @@ function Field(params, index) {
 	};
 };
 
-const building_replica = [];
 function build_replicas() {
 	let s = buiData.length;
 	for (let i = 0; i < s; ++i)
@@ -330,7 +321,7 @@ function build_replica(info, type) {
 		out_u = getFunc(info.out_u),
 		cost_u = getFunc(info.cost_u);
 
-	res.create = (owner) => {
+	res.create = (map, owner) => {
 		var time = info.time, cap = info.cap,
 			my_cost = upgrade_cost(cost);
 		this.type = type;
@@ -338,40 +329,89 @@ function build_replica(info, type) {
 		this.out = info.out;
 		this.neighbours = [];
 		this.outputs = [];
-		this.product = 0;
-		this.call = () => {
-			let mass = 0, max_mass = this.inp;
-			neighbours.every((elem) => {
-				if (mass == max_mass) return false;
-				let d = Math.min(max_mass - mass, Math.floor(elem.product / elem.outputs.length));
-				elem.product -= d;
-				mass += d;
-				return true;
-			});
-			this.product += Math.floor(mass / this.inp * this.out);
-		};
+		this.product = new Resources(cap);
+		if (info.func.includes("store")) {
+			this.call = () => {
+				let dr = 0, dg = 0, db = 0, tves = this.product;
+				this.neighbours.every((elem) => {
+					if (tves.sum() == cap)
+						return false;
+					let d = tves.tryChange(elem.product);
+					dr += d.r;
+					dg += d.g;
+					db += d.b;
+					elem.product.r -= d.r;
+					elem.product.g -= d.g;
+					elem.product.b -= d.b;
+					return true;
+				});
+				player_list[field_list[map].getPlayer(owner)].tryChangeRes({r: dr, g: dg, b: db});
+			};
+		} else if (info.func.includes("sell")) {
+			this.call = () => {
+				let mass = 0, max_mass = this.inp;
+				this.neighbours.every((elem) => {
+					if (mass == max_mass) return false;
+					let d = 0;
+					d += Math.min(max_mass - mass - d, Math.floor(elem.product.r / elem.outputs.length));
+					d += Math.min(max_mass - mass - d, Math.floor(elem.product.g / elem.outputs.length));
+					d += Math.min(max_mass - mass - d, Math.floor(elem.product.b / elem.outputs.length));
+					mass += d;
+					return true;
+				});
+				player_list[field_list[map].getPlayer(owner)].tryChangeRes({m: Math.floor(mass / max_mass * this.out)});
+			};
+		} else {
+			this.call = () => {
+				let mass = {r: 0, g: 0, b: 0, sum: () => r + g + b}, max_mass = this.inp;
+				neighbours.every((elem) => {
+					if (mass.sum() == max_mass) return false;
+					if (info.func.includes("_r") || info.func.includes("_u")) {
+						let dr = Math.min(max_mass - mass.sum(), Math.floor(elem.product.r / elem.outputs.length));
+						elem.product.r -= dr;
+						mass.r += dr;
+					}
+					if (info.func.includes("_g") || info.func.includes("_u")) {
+						let dg = Math.min(max_mass - mass.sum(), Math.floor(elem.product.g / elem.outputs.length));
+						elem.product.g -= dg;
+						mass.g += dg;
+					}
+					if (info.func.includes("_b") || info.func.includes("_u")) {
+						let db = Math.min(max_mass - mass.sum(), Math.floor(elem.product.b / elem.outputs.length));
+						elem.product.b -= db;
+						mass.b += db;
+					}
+					return true;
+				});
+				this.product.r += Math.floor(mass.r / this.inp * this.out);
+				this.product.g += Math.floor(mass.g / this.inp * this.out);
+				this.product.b += Math.floor(mass.b / this.inp * this.out);
+			};
+		}
 		this.upgrade = () => {
 			this.inp = in_u(this.inp);
 			this.out = out_u(this.out);
 			time = time_u(time);
 			cap = cap_u(cap);
 			my_cost = upgrade_cost(my_cost);
-		}
+		};
 		this.getUpgradeCost = () => my_cost;
 		this.getTime = () => time;
 		this.getCapacity = () => cap;
 	};
 
+	function upgrade_cost(cost) {
+		return {
+			r: cost_u(cost.r),
+			g: cost_u(cost.g),
+			b: cost_u(cost.b),
+			m: cost_u(cost.m)
+		};
+	};
+
 	return res;
 };
-function upgrade_cost(cost) {
-	return {
-		r: cost_u(cost.r),
-		g: cost_u(cost.g),
-		b: cost_u(cost.b),
-		m: cost_u(cost.m)
-	};
-};
+
 function buildFunc(comm) {
 	var seq = comm.split(" ");
 	if (seq[0] == "add") return add(seq[1]);
@@ -380,8 +420,8 @@ function buildFunc(comm) {
 var add = (num) => (x) => {return x == -1 ? -1 : (x + Number(num));},
 	mul = (num) => (x) => {return x == -1 ? -1 : (x * Number(num));};
 
-function makeBuilding(id, owner) {
-	return new building_replica[id - 1].create(owner);
+function makeBuilding(id, owner, map) {
+	return new building_replica[id - 1].create(map, owner);
 };
 function getBuildCost(id) {
 	return building_replica[id - 1].getCost();
