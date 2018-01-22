@@ -1,7 +1,8 @@
 const map_gen = require('./client/lib/map_gen').MapGen,
 	  coords = require('./client/lib/coords').CoordsEnvironment,
 	  fs = require('fs'),
-	  Papa = require('papaparse');
+	  Papa = require('papaparse'),
+	  sync = require('synchronize');
 
 const express = require('express'),
 	  app = express(),
@@ -13,14 +14,19 @@ app.get('/', (req, res) => {
 });
 app.use('/client', express.static(__dirname + '/client'));
 
-const mapData = parse('map-table'), 
-	  resData = parse('player-table'), 
-	  buiData = parse('buildings-table'),
-	  linkData = parse('link-table');
+const table_names = ['map-table', 'player-table', 'buildings-table', 'link-table'];
+var mapData,
+	resData,
+	buiData,
+	linkData;
+
+var parses = [];
+table_names.forEach((elem) => parse(elem));
+
 const building_replica = [];
 
 var countLoads = 0;
-const numberOfParses = 3;
+const numberOfParses = 4;
 
 var field_list = [],
 	player_list = [];
@@ -28,7 +34,13 @@ var field_list = [],
 io.sockets.on('connection', (socket) => {
 	console.log(`socket ${socket.id} connected`);
 	if (countLoads == numberOfParses) {
-		if (!building_replica.length) build_replicas();
+		if (!building_replica.length) {
+			mapData = parses[table_names[0]];
+			resData = parses[table_names[1]];
+			buiData = parses[table_names[2]];
+			linkData = parses[table_names[3]];
+			build_replicas();
+		}
 		var indexPlayer, indexField, indexOfMap;
 		socket.on('new_player', (data) => {
 			console.log(`new player ${data.id}`);
@@ -83,24 +95,24 @@ io.sockets.on('connection', (socket) => {
 server.listen(process.env.PORT || 4000);
 
 function parse(name) {
-	var resData;
 	fs.readFile(`./res/${name}.csv`, 'utf-8', (err, data) => {
 		if (err) {
 			console.log(`error while reading file ${name} occured`);
 			throw err;
 		}
 		console.log(`${name} succesfully read`);
-		resData = Papa.parse(data, {
+		Papa.parse(data, {
 			header: true, 
 			dynamicTyping: true,
 			complete: (result) => {
 				if (result.data[0].richness) result.data.forEach((elem) => elem.richness /= 100);
+				parses[name] = result.data;
 				++countLoads;
 				console.log(`${name} succesfully parsed`);
+				console.log(result.data);
 			}
-		}).data;
+		});
 	});
-	return resData;
 }
 
 function next_player() {
@@ -115,9 +127,10 @@ function next_player() {
 
 //player_id stores socket.ids
 function Player(player_id, spawn_point) {
+	var res = new Resources();
+	var capacity = res.sum();
 	this.getId = () => player_id;
 	this.getSpawn = () => spawn_point;
-	var res = new Resources();
 	this.tryChangeRes = (data, option) => {
 		var ans = res.tryChange(data, option);
 		if (ans) {
@@ -127,7 +140,6 @@ function Player(player_id, spawn_point) {
 		return ans;
 	};
 	this.buildings = 0;
-	var capacity = res.sum();
 	this.changeCapacity = (delta) => capacity += delta;
 };
 
@@ -159,15 +171,17 @@ function Resources() {
 	this.toJSON = () => {return {r: R, g: G, b: B, m: M};}
 	this.sum = () => R + G + B;
 }
-function Resources(maxCapacity) {
+function Vessel(maxCapacity) {
 	var R = 0, G = 0, B = 0;
-	this.tryChange = (delta) => {
-		let dr = Math.min(delta.r, maxCapacity - R - G - B);
-		R += dr;
-		let dg = Math.min(delta.g, maxCapacity - R - G - B);
-		G += dg;
-		let db = Math.min(delta.b, maxCapacity - R - G - B);
-		B += db;
+	this.tryChange = (delta, div) => {
+		with(Math) {
+			let dr = min(floor(delta.r / div), maxCapacity - R - G - B);
+			R += dr;
+			let dg = min(floor(delta.g / div), maxCapacity - R - G - B);
+			G += dg;
+			let db = min(floor(delta.b / div), maxCapacity - R - G - B);
+			B += db;
+		}
 		return {r: dr, g: dg, b: db};
 	}
 }
@@ -312,10 +326,12 @@ function Field(params, index) {
 
 function build_replicas() {
 	let s = buiData.length;
-	for (let i = 0; i < s; ++i)
-		building_replica.push(build_replica(buiData[i], i));
+	for (let i = 0; i < s && buiData[i].func.length > 0; ++i)
+		building_replica[i] = build_replica(buiData[i], i);
+	console.log('replicas built');
 };
 function build_replica(info, type) {
+	console.log(`building replica ${type}`);
 	var res = {},
 		cost = {
 			r: info.cost_r,
@@ -339,14 +355,14 @@ function build_replica(info, type) {
 		this.out = info.out;
 		this.neighbours = [];
 		this.outputs = [];
-		this.product = new Resources(cap);
+		this.product = new Vessel(cap);
 		if (info.func.includes("store")) {
 			this.call = () => {
 				let dr = 0, dg = 0, db = 0, tves = this.product;
 				this.neighbours.every((elem) => {
 					if (tves.sum() == cap)
 						return false;
-					let d = tves.tryChange(elem.product);
+					let d = tves.tryChange(elem.product, elem.outputs.length);
 					dr += d.r;
 					dg += d.g;
 					db += d.b;
@@ -360,12 +376,14 @@ function build_replica(info, type) {
 		} else if (info.func.includes("sell")) {
 			this.call = () => {
 				let mass = 0, max_mass = this.inp;
-				this.neighbours.every((elem) => {
+				this.neighbours.every((elem, i, arr) => {
 					if (mass == max_mass) return false;
 					let d = 0;
-					d += Math.min(max_mass - mass - d, Math.floor(elem.product.r / elem.outputs.length));
-					d += Math.min(max_mass - mass - d, Math.floor(elem.product.g / elem.outputs.length));
-					d += Math.min(max_mass - mass - d, Math.floor(elem.product.b / elem.outputs.length));
+					with(Math) {
+						d += min(min(max_mass - mass - d, floor(max_mass / arr.length)), floor(elem.product.r / elem.outputs.length));
+						d += min(min(max_mass - mass - d, floor(max_mass / arr.length)), floor(elem.product.g / elem.outputs.length));
+						d += min(min(max_mass - mass - d, floor(max_mass / arr.length)), floor(elem.product.b / elem.outputs.length));
+					}
 					mass += d;
 					return true;
 				});
@@ -374,22 +392,24 @@ function build_replica(info, type) {
 		} else {
 			this.call = () => {
 				let mass = {r: 0, g: 0, b: 0, sum: () => r + g + b}, max_mass = this.inp;
-				neighbours.every((elem) => {
+				neighbours.every((elem, i, arr) => {
 					if (mass.sum() == max_mass) return false;
-					if (info.func.includes("_r") || info.func.includes("_u")) {
-						let dr = Math.min(max_mass - mass.sum(), Math.floor(elem.product.r / elem.outputs.length));
-						elem.product.r -= dr;
-						mass.r += dr;
-					}
-					if (info.func.includes("_g") || info.func.includes("_u")) {
-						let dg = Math.min(max_mass - mass.sum(), Math.floor(elem.product.g / elem.outputs.length));
-						elem.product.g -= dg;
-						mass.g += dg;
-					}
-					if (info.func.includes("_b") || info.func.includes("_u")) {
-						let db = Math.min(max_mass - mass.sum(), Math.floor(elem.product.b / elem.outputs.length));
-						elem.product.b -= db;
-						mass.b += db;
+					with(Math) {
+						if (info.func.includes("_r") || info.func.includes("_u")) {
+							let dr = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.r / elem.outputs.length));
+							elem.product.r -= dr;
+							mass.r += dr;
+						}
+						if (info.func.includes("_g") || info.func.includes("_u")) {
+							let dg = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.g / elem.outputs.length));
+							elem.product.g -= dg;
+							mass.g += dg;
+						}
+						if (info.func.includes("_b") || info.func.includes("_u")) {
+							let db = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.b / elem.outputs.length));
+							elem.product.b -= db;
+							mass.b += db;
+						}
 					}
 					return true;
 				});
@@ -422,10 +442,10 @@ function build_replica(info, type) {
 	return res;
 };
 
-function buildFunc(comm) {
+function getFunc(comm) {
 	var seq = comm.split(" ");
 	if (seq[0] == "add") return add(seq[1]);
-	if (seg[0] == "multiply") return mul(seq[1]);
+	if (seq[0] == "multiply") return mul(seq[1]);
 };
 var add = (num) => (x) => {return x == -1 ? -1 : (x + Number(num));},
 	mul = (num) => (x) => {return x == -1 ? -1 : (x * Number(num));};
