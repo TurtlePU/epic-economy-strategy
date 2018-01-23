@@ -51,7 +51,7 @@ io.sockets.on('connection', (socket) => {
 			);
 			player_list.push(new_player);
 			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
-			spawn.table = buiData;
+			spawn.buildings = buiData;
 			socket.emit('gameDataSend', spawn);
 		});
 		socket.on('build', (data) => {
