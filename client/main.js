@@ -25,13 +25,9 @@ TODO:
 	* JSON:
 		r, g, b, m - total of resources
 		cap - capacity
-2. Events:
-	on - inside game_data_send
-	* table:
-		buildings-table parsed
-3. Graphics:
+2. Graphics:
 	shown below
-4. Gameplay:
+3. Gameplay:
 	add mousedown for overlay which emits events form (1)
 */
 
@@ -295,38 +291,27 @@ function fillSpriteContainer(i, j) {
 	for (let x = 0; x < chunkWidthInCells; ++x) {
 		if (!mapOfChunks[i][j].res[x]) break;
 		for (let y = 0; y < chunkHeightInCells; ++y) {
-			var cellSprites = getSpritesOfCell(i, j, x, y);
-			chunkContainers[i][j].addChild(
-				cellSprites[0]//, 
-				//cellSprites[1]
-			);
-			var pc = new CE.Offset(x, y).toPoint();
-			cellSprites[0].x = 
-			//cellSprites[1].x = 
-			pc.getX();
-			cellSprites[0].y = 
-			//cellSprites[1].y = 
-			pc.getY();
+			var cellSprite = getSpriteOfCell(i, j, x, y),
+				pc = new CE.Offset(x, y).toPoint();
+			cellSprite.x = pc.getX();
+			cellSprite.y = pc.getY();
+			chunkContainers[i][j].addChild(cellSprite);
 		}
 	}
 	stage.addChild(chunkContainers[i][j]);
 };
 
-function getPathsOfCellImage(i, j, x, y) {
+function getPathOfCellImage(i, j, x, y) {
 	if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
-	return [
-		img(`cell_color${mapOfChunks[i][j].res[x][y]}`)//,
-		//img(mapOfChunks[i][j].bui[x][y] ? `building${mapOfChunks[i][j].bui[x][y]}` : `cell_color0`)
-	];
+	if (mapOfChunks[i][j].res[x][y])
+		return img(`cell_color${mapOfChunks[i][j].res[x][y]}`);
+	if (mapOfChunks[i][j].bui && mapOfChunks[i][j].bui[x] && mapOfChunks[i][j].bui[x][y])
+		return img(`building${mapOfChunks[i][j].bui[x][y]}`);
+	return img('cell_color0');
 };
 
-function getSpritesOfCell(i, j, x, y) {
-	var strs = getPathsOfCellImage(i, j, x, y);
-	var arr = [];
-	strs.forEach(function(item, index, array) {
-		arr.push(new PIXI.Sprite(texture(item)));
-	});
-	return arr;
+function getSpriteOfCell(i, j, x, y) {
+	return new PIXI.Sprite(texture(getPathOfCellImage(i, j, x, y)));
 };
 
 function velocityTick() {
