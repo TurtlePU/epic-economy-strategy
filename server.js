@@ -49,6 +49,7 @@ io.sockets.on('connection', (socket) => {
 				data.id, spawn
 				//another params
 			);
+			spawn.resources = new_player.getRes();
 			player_list.push(new_player);
 			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
 			spawn.buildings = buiData;
@@ -131,6 +132,7 @@ function Player(player_id, spawn_point) {
 	var capacity = res.sum();
 	this.getId = () => player_id;
 	this.getSpawn = () => spawn_point;
+	this.getRes = () => res;
 	this.tryChangeRes = (data, option) => {
 		var ans = res.tryChange(data, option);
 		if (ans) {
