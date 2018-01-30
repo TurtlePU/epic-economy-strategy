@@ -1,38 +1,7 @@
-/*
-TODO:
-	emit - build(data)
-	* data:
-		option: resources(0) / money(1)
-		build:
-			cx: chunk x
-			cy: chunk y
-			dx: rel.offset row
-			dy: rel.offset col
-			value: index of building
-	
-	emit - upgrade_building(data)
-	* data:
-		option: resources(0) / money(1)
-		coords:
-			cx, cy, dx, dy
-	
-	emit - remove_building(data)
-	* data:
-		cx, cy, dx, dy
-
-	on - resources_updated(JSON)
-	* JSON:
-		r, g, b, m - total of resources
-		cap - capacity
-2. Graphics:
-	shown below
-3. Gameplay:
-	add mousedown for overlay which emits events form (1)
-*/
-
 function GameEnvironment(PIXI, EE) {
 	const gl = new PIXI.autoDetectRenderer(256, 256),
-		  imagePathList = buildImgPathList();
+		  imagePathList = buildImgPathList(),
+		  GE = this;
 	
 	this.start = () => {
 		sayHello();
@@ -58,7 +27,7 @@ function GameEnvironment(PIXI, EE) {
 		fillSpriteArray();
 		content.addChild(stage);
 
-		drawOverlay();
+		drawOverlay(gameData.resources);
 		content.addChild(overlay);
 
 		gl.render(content);
@@ -73,6 +42,11 @@ function GameEnvironment(PIXI, EE) {
 		mapOfChunks[chunk.x][chunk.y] = chunk;
 		fillSpriteContainer(chunk.x, chunk.y);
 		updRenderingBounds(zeroPoint);
+	};
+
+	var resText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 0x000000, align : 'center'});
+	this.updateResources = (data) => {
+		resText.text = `R: ${data.r} G: ${data.g} B: ${data.b} M: ${data.m} Cap: ${data.cap}`;
 	};
 
 	setInterval(velocityTick, 2);
@@ -110,8 +84,11 @@ function GameEnvironment(PIXI, EE) {
 	function showProgress(loader, resource) {
 		console.log("loading...");
 		//TODO: Normal progress bar
-		if (!progressText)
+		if (!progressText) {
 			progressText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 0xffffff, align : 'center'});
+			let tmp = new PIXI.Container();
+			gl.render(tmp);
+		}
 		progressText.text = `Progress: ${loader.progress}%`;
 	};
 
@@ -198,6 +175,29 @@ function GameEnvironment(PIXI, EE) {
 			focus = newFocus;
 			//TODO: show choice menu
 		}, {passive: true});
+		/*
+		TODO: more mousedown for overlays
+		Hints:
+			EE.emitBuild(data)
+			* data:
+				option: resources(0) / money(1)
+				build:
+					cx: chunk x
+					cy: chunk y
+					dx: rel.offset row
+					dy: rel.offset col
+					value: index of building
+			
+			EE.emitUpgradeBuilding(data)
+			* data:
+				option: resources(0) / money(1)
+				coords:
+					cx, cy, dx, dy
+
+			EE.emitRemoveBuilding(data)
+			* data:
+				cx, cy, dx, dy
+		*/
 	};
 
 	var chunkContainers = [[]];
@@ -246,8 +246,9 @@ function GameEnvironment(PIXI, EE) {
 		return new PIXI.Sprite(texture(getPathOfCellImage(i, j, x, y)));
 	};
 
-	function drawOverlay() {
+	function drawOverlay(resources) {
 		//TODO: draw overlay
+		GE.updateResources(resources);
 	};
 
 	function velocityTick() {
