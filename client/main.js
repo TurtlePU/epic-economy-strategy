@@ -117,10 +117,13 @@ function sayHello() {
 	PIXI.utils.sayHello(type);
 };
 
+var progressText;
 function showProgress(loader, resource) {
 	console.log("loading...");
-	//TODO: Progress bar
-	//loader.progress - progress in %
+	//TODO: Normal progress bar
+	if (!progressText)
+		progressText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 0x000000, align : 'center'});
+	progressText.text = `Progress: ${loader.progress}%`;
 };
 
 var cellSideSizeInPixels;
