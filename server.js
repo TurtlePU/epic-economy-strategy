@@ -132,7 +132,11 @@ function Player(player_id, spawn_point) {
 	var capacity = res.sum();
 	this.getId = () => player_id;
 	this.getSpawn = () => spawn_point;
-	this.getRes = () => res;
+	this.getRes = () => {
+		var ret = res.toJSON();
+		ret.cap = capacity;
+		return ret;
+	};
 	this.tryChangeRes = (data, option) => {
 		var ans = res.tryChange(data, option);
 		if (ans) {
