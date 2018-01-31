@@ -1,0 +1,16 @@
+name;prev;next;value
+mine;main_types;mine_types;0
+mine_r;mine_types;option;1
+mine_g;mine_types;option;2
+mine_b;mine_types;option;3
+mine_u;mine_types;option;4
+prod;main_types;prod_types;0
+prod_r;prod_types;option;5
+prod_g;prod_types;option;6
+prod_b;prod_types;option;7
+prod_u;prod_types;option;8
+sell;main_types;option;9
+store;main_types;store_types;0
+store_0;store_types;option;10
+store_1;store_types;option;11
+upgrade_0;upgrade;option;0
