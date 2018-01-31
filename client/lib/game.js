@@ -1,4 +1,4 @@
-function GameEnvironment(PIXI, EE) {
+function GameEnvironment(PIXI, Papa, EE) {
 	const gl = new PIXI.autoDetectRenderer(256, 256),
 		  imagePathList = buildImgPathList(),
 		  GE = this;
@@ -18,7 +18,7 @@ function GameEnvironment(PIXI, EE) {
 		  overlay = new PIXI.Container();
 
 	var zeroPoint;
-	var tick = false;
+	var state = 0;
 
 	this.build = (gameData) => {
 		getBounds(gameData.mapParams, gameData.homeCell);
@@ -33,7 +33,7 @@ function GameEnvironment(PIXI, EE) {
 		gl.render(content);
 
 		updRenderingBounds(zeroPoint);
-		tick = true;
+		++state;
 	};
 
 	var mapOfChunks = [[]];
@@ -44,7 +44,7 @@ function GameEnvironment(PIXI, EE) {
 		updRenderingBounds(zeroPoint);
 	};
 
-	var resText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 0x000000, align : 'center'});
+	var resText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 'black', align : 'center'});
 	this.updateResources = (data) => {
 		resText.text = `R: ${data.r} G: ${data.g} B: ${data.b} M: ${data.m} Cap: ${data.cap}`;
 	};
@@ -64,6 +64,16 @@ function GameEnvironment(PIXI, EE) {
 		for (let i = 1; i < 12; ++i)
 			for (let j = 0; j < 7; ++j)
 				res.push(img(`building${i}_${j}`));
+		for (let i = 0; i < 2; ++i)
+			res.push(img(`menu_0_${i}`));
+		for (let i = 0; i < 3; ++i)
+			res.push(img(`menu_4_${i}`));
+		res.push(img(`menu_3_0`));
+		for (let i = 1; i < 3; ++i)
+			for (let j = 0; j < 5; ++j)
+				res.push(img(`menu_${i}_${j}`));
+		res.push(img(`menu_5`));
+		res.push(img(`menu_6`));
 		return res;
 	}
 
@@ -85,8 +95,9 @@ function GameEnvironment(PIXI, EE) {
 		console.log("loading...");
 		//TODO: Normal progress bar
 		if (!progressText) {
-			progressText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 0xffffff, align : 'center'});
+			progressText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 'white', align : 'center'});
 			let tmp = new PIXI.Container();
+			tmp.addChild(progressText);
 			gl.render(tmp);
 		}
 		progressText.text = `Progress: ${loader.progress}%`;
@@ -152,6 +163,7 @@ function GameEnvironment(PIXI, EE) {
 
 	this.resize = (window) => (event) => {
 		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		updateOverlayCoords();
 		focus = boundsOnMapInPixels.topLeft.add(d);
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
@@ -164,40 +176,94 @@ function GameEnvironment(PIXI, EE) {
 		}
 	};
 
+	const menu = [];
 	this.addMouseListener = () => {
+		var data;
+
 		stage.interactive = true;
 		stage.on('mousedown', (event) => {
+			if (state < 2) return;
+			
 			var relativePoint = event.data.getLocalPosition(stage);
 			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
 							.toOffset()
 							.toPoint();
 			updRenderingBounds(newFocus.sub(focus));
 			focus = newFocus;
-			//TODO: show choice menu
-		}, {passive: true});
-		/*
-		TODO: more mousedown for overlays
-		Hints:
-			EE.emitBuild(data)
-			* data:
-				option: resources(0) / money(1)
-				build:
-					cx: chunk x
-					cy: chunk y
-					dx: rel.offset row
-					dy: rel.offset col
-					value: index of building
-			
-			EE.emitUpgradeBuilding(data)
-			* data:
-				option: resources(0) / money(1)
-				coords:
-					cx, cy, dx, dy
 
-			EE.emitRemoveBuilding(data)
-			* data:
-				cx, cy, dx, dy
-		*/
+			var chunk = focus.toOffset().toChunk(),
+				offset = focus.toOffset().sub(chunk.toOffset());
+			var tmp = {
+				cx: chunk.getX(), 
+				cy: chunk.getY(),
+				dx: offset.getRow(),
+				dy: offset.getCol()
+			};
+
+			menu['main_types'].hide();
+			menu['upgrade'].hide();
+			
+			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
+				console.log('open build menu');
+				data = {build: tmp};
+				menu['main_types'].visible = true;
+			} else if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
+				console.log('open upgrade menu');
+				data = {coords: tmp};
+				menu['upgrade'].visible = true;
+			}
+		}, {passive: true});
+
+		Papa.parse('./client/res/build-menu-links-table.csv', {
+			download: true,
+			header: true,
+			dynamicTyping: true,
+			step: function(row) {
+				var elem = row.data[0];
+				if (!elem.name.length) return;
+				menu[elem.name].on('mousedown', (event) => {
+					if (state < 2) return;
+					menu[elem.prev].visible = false;
+					menu[elem.next].visible = true;
+					if (data.build)
+						data.build.value = elem.value;
+				});
+			},
+			complete: function(result) {
+				++state;
+				console.log('parse finished');
+			}
+		});
+		menu['option0'].on('mousedown', (event) => {
+			if (state < 2) return;
+			data.option = false;
+			menu['option'].visible = false;
+			tryEmit(data);
+		});
+		menu['option1'].on('mousedown', (event) => {
+			if (state < 2) return;
+			data.option = true;
+			menu['option'].visible = false;
+			tryEmit(data);
+		});
+		menu['remove'].on('mousedown', (event) => {
+			if (state < 2) return;
+			menu['upgrade'].visible = false;
+			EE.emitRemoveBuilding(data.coords);
+		});
+	};
+
+	function empty(cx, cy, dx, dy) {
+		return !(mapOfChunks[cx][cy].bui && 
+			mapOfChunks[cx][cy].bui[dx] &&
+			mapOfChunks[cx][cy].bui[dx][dy]); 
+	};
+
+	function tryEmit(data) {
+		if (data.build)
+			EE.emitBuild(data);
+		else
+			EE.emitUpgradeBuilding(data);
 	};
 
 	var chunkContainers = [[]];
@@ -246,13 +312,117 @@ function GameEnvironment(PIXI, EE) {
 		return new PIXI.Sprite(texture(getPathOfCellImage(i, j, x, y)));
 	};
 
+	function sprite(name) {
+		return new PIXI.Sprite(texture(img(name)));
+	}
+
 	function drawOverlay(resources) {
-		//TODO: draw overlay
+		overlay.addChild(menu['0'] = new PIXI.Container());
+
+		let zeroOffset = new CE.Offset(0, 0), upLeft = zeroOffset.upperLeftPixel();
+		
+		let neighbours = [];
+		for (let i = 0; i < 6; ++i)
+			neighbours[i] = zeroOffset.getNeighbor(i).toPoint();
+
+		menu['0'].addChild(
+			menu['main_types'] = new PIXI.Container(),
+			menu['upgrade'] = new PIXI.Container(),
+			menu['option'] = new PIXI.Container()
+		);
+
+		menu['main_types'].position = 
+		menu['upgrade'].position = 
+		menu['option'].position = new PIXI.Point(upLeft.getX(), upLeft.getY());
+
+		menu['option'].addChild(
+			menu['option0'] = sprite('menu_0_0'),
+			menu['option1'] = sprite('menu_0_1')
+		);
+
+		menu['upgrade'].addChild(
+			menu['upgrade_0'] = sprite('menu_5'),
+			menu['remove'] = sprite('menu_6')
+		);
+		menu['upgrade'].hide = () => {
+			menu['upgrade'].visible = false;
+			menu['option'].visible = false;
+		};
+
+		menu['upgrade_0'].coords = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
+		menu['remove'].coords = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
+		
+		menu['main_types'].addChild(
+			menu['mine'] = sprite('menu_1_0'),
+			menu['mine_types'] = new PIXI.Container(),
+			menu['prod'] = sprite('menu_2_0'),
+			menu['prod_types'] = new PIXI.Container(),
+			menu['sell'] = sprite('menu_3_0'),
+			menu['store'] = sprite('menu_4_0'),
+			menu['store_types'] = new PIXI.Container()
+		);
+		menu['main_types'].hide = () => {
+			menu['main_types'].visible = false;
+			menu['mine_types'].visible = false;
+			menu['prod_types'].visible = false;
+			menu['store_types'].visible = false;
+			menu['option'].visible = false;
+		};
+
+		menu['mine_types'].x = menu['mine'].x = neighbours[3].getX();
+		menu['mine_types'].y = menu['mine'].y = neighbours[3].getY();
+
+		menu['prod_types'].x = menu['prod'].x = neighbours[2].getX();
+		menu['prod_types'].y = menu['prod'].y = neighbours[2].getY();
+		
+		menu['sell'].x = neighbours[1].getX();
+		menu['sell'].y = neighbours[1].getY();
+
+		menu['store_types'].x = menu['store'].x = neighbours[0].getX();
+		menu['store_types'].y = menu['store'].y = neighbours[0].getY();
+		
+		menu['mine_types'].addChild(
+			menu['mine_r'] = sprite('menu_1_1'),
+			menu['mine_g'] = sprite('menu_1_2'),
+			menu['mine_b'] = sprite('menu_1_3'),
+			menu['mine_u'] = sprite('menu_1_4')
+		);
+
+		menu['mine_r'].coords = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
+		menu['mine_g'].coords = new PIXI.Point(neighbours[3].getX(), neighbours[3].getY());
+		menu['mine_b'].coords = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
+
+		menu['prod_types'].addChild(
+			menu['prod_r'] = sprite('menu_2_1'),
+			menu['prod_g'] = sprite('menu_2_2'),
+			menu['prod_b'] = sprite('menu_2_3'),
+			menu['prod_u'] = sprite('menu_2_4')
+		);
+
+		menu['prod_r'].coords = new PIXI.Point(neighbours[4].getX(), neighbours[4].getY());
+		menu['prod_g'].coords = new PIXI.Point(neighbours[2].getX(), neighbours[2].getY());
+		menu['prod_b'].coords = new PIXI.Point(neighbours[0].getX(), neighbours[0].getY());
+
+		menu['store_types'].addChild(
+			menu['store_0'] = sprite('menu_4_1'),
+			menu['store_1'] = sprite('menu_4_2')
+		);
+
+		menu['main_types'].hide();
+		menu['upgrade'].hide();
+
+		updateOverlayCoords();
+
 		GE.updateResources(resources);
+		overlay.addChild(resText);
+	};
+	function updateOverlayCoords() {
+		menu['0'].x = d.getX();
+		menu['0'].y = d.getY();
 	};
 
 	function velocityTick() {
-		if (tick) {
+		if (state == 2) {
 			focus = focus.add(focusVelocity);
 			boundsOnMapInPixels.pushFocus();
 			updRenderingBounds(focusVelocity);
