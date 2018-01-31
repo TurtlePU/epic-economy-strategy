@@ -29,6 +29,9 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
         var add = function(offset) {
             return new CE.Offset(row + offset.getRow(), col + offset.getCol());
         }.bind(this);
+        this.sub = function(offset) {
+            return new CE.Offset(row - offset.getRow(), col - offset.getCol());
+        }
 
         this.getNeighbor = function(direction) {
             return this.toCube().getNeighbor(direction).toOffset();
