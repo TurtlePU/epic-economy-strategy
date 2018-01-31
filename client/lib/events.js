@@ -1,6 +1,6 @@
-function EventsEnvironment(window, socket, PIXI) {
+function EventsEnvironment(window, socket, PIXI, Papa) {
 	const EE = this,
-		  GE = new GameEnvironment(PIXI, EE);
+		  GE = new GameEnvironment(PIXI, Papa, EE);
 	
 	this.start = () => { GE.start(); };
 
