@@ -20,7 +20,11 @@ function GameEnvironment(PIXI, Papa, EE) {
 	var zeroPoint;
 	var state = 0;
 
+	var buildInfo;
+
 	this.build = (gameData) => {
+		buildInfo = gameData.buiData;
+
 		getBounds(gameData.mapParams, gameData.homeCell);
 		fillMap(gameData.mapParams, gameData.buildings);
 
@@ -150,11 +154,12 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	function fillMap(mapParams, buildings) {
 		mapOfChunks = MapGen.buildChunked(mapParams);
+		console.log(buildings);
 		if (buildings.length) {
 			for (let i = 0; i < mapWidthInChunks; ++i) {
-				if (buildings[i] === undefined) continue;
+				if (!buildings[i]) continue;
 				for (let j = 0; j < mapHeightInChunks; ++j) {
-					if (buildings[i][j] === undefined) continue;
+					if (!buildings[i][j]) continue;
 					mapOfChunks[i][j].bui = buildings[i][j];
 				}
 			}
@@ -221,6 +226,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			step: function(row) {
 				var elem = row.data[0];
 				if (!elem.name.length) return;
+				menu[elem.name].interactive = true;
 				menu[elem.name].on('mousedown', (event) => {
 					if (state < 2) return;
 					menu[elem.prev].visible = false;
@@ -234,18 +240,21 @@ function GameEnvironment(PIXI, Papa, EE) {
 				console.log('parse finished');
 			}
 		});
+		menu['option0'].interactive = true;
 		menu['option0'].on('mousedown', (event) => {
 			if (state < 2) return;
 			data.option = false;
 			menu['option'].visible = false;
 			tryEmit(data);
 		});
+		menu['option1'].interactive = true;
 		menu['option1'].on('mousedown', (event) => {
 			if (state < 2) return;
 			data.option = true;
 			menu['option'].visible = false;
 			tryEmit(data);
 		});
+		menu['remove'].interactive = true;
 		menu['remove'].on('mousedown', (event) => {
 			if (state < 2) return;
 			menu['upgrade'].visible = false;
@@ -327,11 +336,17 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 		menu['0'].addChild(
 			menu['main_types'] = new PIXI.Container(),
+			menu['mine_types'] = new PIXI.Container(),
+			menu['prod_types'] = new PIXI.Container(),
+			menu['store_types'] = new PIXI.Container(),
 			menu['upgrade'] = new PIXI.Container(),
 			menu['option'] = new PIXI.Container()
 		);
 
 		menu['main_types'].position = 
+		menu['mine_types'].position = 
+		menu['prod_types'].position = 
+		menu['store_types'].position = 
 		menu['upgrade'].position = 
 		menu['option'].position = new PIXI.Point(upLeft.getX(), upLeft.getY());
 
@@ -354,12 +369,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 		
 		menu['main_types'].addChild(
 			menu['mine'] = sprite('menu_1_0'),
-			menu['mine_types'] = new PIXI.Container(),
 			menu['prod'] = sprite('menu_2_0'),
-			menu['prod_types'] = new PIXI.Container(),
 			menu['sell'] = sprite('menu_3_0'),
-			menu['store'] = sprite('menu_4_0'),
-			menu['store_types'] = new PIXI.Container()
+			menu['store'] = sprite('menu_4_0')
 		);
 		menu['main_types'].hide = () => {
 			menu['main_types'].visible = false;
@@ -369,17 +381,17 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['option'].visible = false;
 		};
 
-		menu['mine_types'].x = menu['mine'].x = neighbours[3].getX();
-		menu['mine_types'].y = menu['mine'].y = neighbours[3].getY();
+		menu['mine_types'].x = menu['mine_types'].x + (menu['mine'].x = neighbours[3].getX());
+		menu['mine_types'].y = menu['mine_types'].y + (menu['mine'].y = neighbours[3].getY());
 
-		menu['prod_types'].x = menu['prod'].x = neighbours[2].getX();
-		menu['prod_types'].y = menu['prod'].y = neighbours[2].getY();
+		menu['prod_types'].x = menu['prod_types'].x + (menu['prod'].x = neighbours[2].getX());
+		menu['prod_types'].y = menu['prod_types'].y + (menu['prod'].y = neighbours[2].getY());
 		
 		menu['sell'].x = neighbours[1].getX();
 		menu['sell'].y = neighbours[1].getY();
 
-		menu['store_types'].x = menu['store'].x = neighbours[0].getX();
-		menu['store_types'].y = menu['store'].y = neighbours[0].getY();
+		menu['store_types'].x = menu['store_types'].x + (menu['store'].x = neighbours[0].getX());
+		menu['store_types'].y = menu['store_types'].y + (menu['store'].y = neighbours[0].getY());
 		
 		menu['mine_types'].addChild(
 			menu['mine_r'] = sprite('menu_1_1'),
@@ -388,10 +400,15 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['mine_u'] = sprite('menu_1_4')
 		);
 
-		menu['mine_r'].coords = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
-		menu['mine_g'].coords = new PIXI.Point(neighbours[3].getX(), neighbours[3].getY());
-		menu['mine_b'].coords = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
-
+		menu['mine_r'].x = neighbours[5].getX();
+		menu['mine_r'].y = neighbours[5].getY();
+		
+		menu['mine_g'].x = neighbours[3].getX();
+		menu['mine_g'].y = neighbours[3].getY();
+		
+		menu['mine_b'].x = neighbours[1].getX();
+		menu['mine_b'].y = neighbours[1].getY();
+		
 		menu['prod_types'].addChild(
 			menu['prod_r'] = sprite('menu_2_1'),
 			menu['prod_g'] = sprite('menu_2_2'),
@@ -399,10 +416,15 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['prod_u'] = sprite('menu_2_4')
 		);
 
-		menu['prod_r'].coords = new PIXI.Point(neighbours[4].getX(), neighbours[4].getY());
-		menu['prod_g'].coords = new PIXI.Point(neighbours[2].getX(), neighbours[2].getY());
-		menu['prod_b'].coords = new PIXI.Point(neighbours[0].getX(), neighbours[0].getY());
-
+		menu['prod_r'].x = neighbours[4].getX();
+		menu['prod_r'].y = neighbours[4].getY();
+		
+		menu['prod_g'].x = neighbours[2].getX();
+		menu['prod_g'].y = neighbours[2].getY();
+		
+		menu['prod_b'].x = neighbours[0].getX();
+		menu['prod_b'].y = neighbours[0].getY();
+		
 		menu['store_types'].addChild(
 			menu['store_0'] = sprite('menu_4_1'),
 			menu['store_1'] = sprite('menu_4_2')
