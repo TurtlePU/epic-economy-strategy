@@ -52,10 +52,12 @@ io.sockets.on('connection', (socket) => {
 			spawn.resources = new_player.getRes();
 			player_list.push(new_player);
 			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
-			spawn.buildings = buiData;
+			spawn.buiData = buiData;
 			socket.emit('gameDataSend', spawn);
 		});
 		socket.on('build', (data) => {
+			console.log('build request: ');
+			console.log(data);
 			if (!(
 				(field_list[indexOfMap].reaches(indexField, data.build) || player_list[indexPlayer].buildings == 0) && 
 				field_list[indexOfMap].empty(data.build) && 
@@ -110,7 +112,6 @@ function parse(name) {
 				parses[name] = result.data;
 				++countLoads;
 				console.log(`${name} succesfully parsed`);
-				console.log(result.data);
 			}
 		});
 	});
@@ -135,12 +136,18 @@ function Player(player_id, spawn_point) {
 	this.getRes = () => {
 		var ret = res.toJSON();
 		ret.cap = capacity;
+		console.log('getRes:');
+		console.log(ret);
 		return ret;
 	};
 	this.tryChangeRes = (data, option) => {
+		console.log('trying to pay: ');
+		console.log(data);
+		console.log(`(${option})`);
 		var ans = res.tryChange(data, option);
+		console.log(`paid? ${ans}`);
 		if (ans) {
-			io.to(player_id).emit('resources_updated', res.toJSON());
+			io.to(player_id).emit('resources_updated', this.getRes());
 			//TODO: substract from storages
 		}
 		return ans;
@@ -218,12 +225,25 @@ function Field(params, index) {
 		bui = [[]],
 		bui_to_send = [[]],
 		players = [],
-		CE = new coords(42, params.chunkWidth, params.chunkHeight);
-	for (let ci = 0; map[ci] !== undefined; ++ci) {
-		for (let cj = 0; map[ci][cj] !== undefined; ++cj) {
-			for (let i = 0; i < params.chunkWidth; ++i) {
+		CE = new coords(42, params.chunkWidth, params.chunkHeight),
+		n = map.length, m = map[0].length;
+	for (let ci = 0; ci < n; ++ci) {
+		bui[ci] = [];
+		for (let cj = 0; cj < m; ++cj) {
+			bui[ci][cj] = [];
+			map[ci][cj].bui = [];
+			for (let i = 0; i < params.chunkWidth && map[ci][cj].res[i]; ++i) {
+				bui[ci][cj][i] = [];
+				map[ci][cj].bui[i] = [];
 				for (let j = 0; j < params.chunkHeight; ++j) {
-					//TODO: fill bui with resources
+					if (map[ci][cj].res[i][j]) {
+						bui[ci][cj][i][j] = {
+							bui: new ResourceSource(map[ci][cj].res[i][j]),
+							val: -map[ci][cj].res[i][j],
+							own: -1
+						};
+						map[ci][cj].bui[i][j] = `${-map[ci][cj].res[i][j]}_-1`;
+					}
 				}
 			}
 		}
@@ -243,21 +263,32 @@ function Field(params, index) {
 	};
 	this.getPlayer = (index) => players[index]; 
 	this.empty = (coords) => {
-		var chunk = map[coords.cx][coords.cy];
-		return chunk.bui[coords.dx][coords.dy] == 0 && chunk.res[coords.dx][coords.dy] == 0;
+		var chunk = map[coords.cx][coords.cy],
+			res = !chunk.bui[coords.dx][coords.dy] && chunk.res[coords.dx][coords.dy] == 0;
+		console.log(`empty? ${res}`);
+		return res;
 	};
 	this.reaches = (player, coords) => {
 		//TODO: will be different
-		return true;
+		var res = true;
+		console.log(`reaches? ${res}`);
+		return res;
 	};
-	this.place_building = sync((data) => {
+	this.place_building = (data) => {
+		if (!bui_to_send[data.cx])
+			bui_to_send[data.cx] = [];
+		if (!bui_to_send[data.cx][data.cy])
+			bui_to_send[data.cx][data.cy] = [];
+		if (!bui_to_send[data.cx][data.cy][data.dx])
+			bui_to_send[data.cx][data.cy][data.dx] = [];
+
 		map[data.cx][data.cy].bui[data.dx][data.dy] = bui_to_send[data.cx][data.cy][data.dx][data.dy] = data.value + "_" + data.owner;
 		
 		var building = makeBuilding(data.value, data.owner, index);
 		
 		var offset = new CE.Offset(data.cx * params.chunkWidth + data.dx, data.cy * params.chunkHeight + data.dy);
 		for (let i = 0; i < 6; ++i) {
-			var neigh = offset.getNeighbour(i),
+			var neigh = offset.getNeighbor(i),
 				nech = neigh.toChunk(),
 				tdx = neigh.getRow() % params.chunkWidth,
 				tdy = neigh.getCol() % params.chunkHeight,
@@ -280,9 +311,11 @@ function Field(params, index) {
 			val: data.value, 
 			clb: setInterval(building.call, building.getTime() * msPerTick)
 		};
+
+		console.log(`succesfully built ${data.value} on ${data.cx} ${data.cy} ${data.dx} ${data.dy}`);
 		
 		this.emit_chunk(data.cx, data.cy);
-	});
+	};
 	this.owns = (player, coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy] && bui[coords.cx][coords.cy][coords.dx][coords.dy].own == player;
 	this.getValue = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].val;
 	this.getUpgradeCost = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].bui.getUpgradeCost();
@@ -330,20 +363,30 @@ function Field(params, index) {
 	};
 };
 
+const start_res = 5000;
+function ResourceSource(type) {
+	this.own = -1;
+	this.type = -type;
+	this.product = {
+		r: type == 1 ? start_res : 0, 
+		g: type == 2 ? start_res : 0,
+		b: type == 3 ? start_res : 0
+	};
+	this.outputs = [];
+};
+
 function build_replicas() {
 	let s = buiData.length;
 	for (let i = 0; i < s && buiData[i].func.length > 0; ++i)
 		building_replica[i] = build_replica(buiData[i], i);
-	console.log('replicas built');
 };
 function build_replica(info, type) {
-	console.log(`building replica ${type}`);
 	var res = {},
 		cost = {
 			r: info.cost_r,
 			g: info.cost_g,
 			b: info.cost_b,
-			m: info.cost_m
+			m: info.cost_gold
 		};
 	res.getCost = () => cost;
 
@@ -353,7 +396,7 @@ function build_replica(info, type) {
 		out_u = getFunc(info.out_u),
 		cost_u = getFunc(info.cost_u);
 
-	res.create = (map, owner) => {
+	res.create = function(map, owner) {
 		var time = info.time, cap = info.cap,
 			my_cost = upgrade_cost(cost);
 		this.type = type;
@@ -397,22 +440,22 @@ function build_replica(info, type) {
 			};
 		} else {
 			this.call = () => {
-				let mass = {r: 0, g: 0, b: 0, sum: () => r + g + b}, max_mass = this.inp;
-				neighbours.every((elem, i, arr) => {
-					if (mass.sum() == max_mass) return false;
+				let mass = {r: 0, g: 0, b: 0}, max_mass = this.inp;
+				this.neighbours.every((elem, i, arr) => {
+					if (mass.r + mass.g + mass.b == max_mass) return false;
 					with(Math) {
 						if (info.func.includes("_r") || info.func.includes("_u")) {
-							let dr = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.r / elem.outputs.length));
+							let dr = min(min(max_mass - (mass.r + mass.g + mass.b), floor(max_mass / arr.length)), floor(elem.product.r / elem.outputs.length));
 							elem.product.r -= dr;
 							mass.r += dr;
 						}
 						if (info.func.includes("_g") || info.func.includes("_u")) {
-							let dg = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.g / elem.outputs.length));
+							let dg = min(min(max_mass - (mass.r + mass.g + mass.b), floor(max_mass / arr.length)), floor(elem.product.g / elem.outputs.length));
 							elem.product.g -= dg;
 							mass.g += dg;
 						}
 						if (info.func.includes("_b") || info.func.includes("_u")) {
-							let db = min(min(max_mass - mass.sum(), floor(max_mass / arr.length)), floor(elem.product.b / elem.outputs.length));
+							let db = min(min(max_mass - (mass.r + mass.g + mass.b), floor(max_mass / arr.length)), floor(elem.product.b / elem.outputs.length));
 							elem.product.b -= db;
 							mass.b += db;
 						}
@@ -457,6 +500,7 @@ var add = (num) => (x) => {return x == -1 ? -1 : (x + Number(num));},
 	mul = (num) => (x) => {return x == -1 ? -1 : (x * Number(num));};
 
 function makeBuilding(id, owner, map) {
+	console.log(`making ${id} of ${owner} on ${map}`);
 	return new building_replica[id - 1].create(map, owner);
 };
 function getBuildCost(id) {
