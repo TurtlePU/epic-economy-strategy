@@ -24,8 +24,8 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	});
 
 	this.emitBuild = (data) => { socket.emit('build', data); };
-	this.emitUpgradeBuilding = (data) => { socket.emit('upgrade_building'); };
-	this.emitRemoveBuilding = (data) => { socket.emit('remove_building'); };
+	this.emitUpgradeBuilding = (data) => { socket.emit('upgrade_building', data); };
+	this.emitRemoveBuilding = (data) => { socket.emit('remove_building', data); };
 
 	socket.on('chunkUpdated', GE.updateChunk);
 	socket.on('resources_updated', GE.updateResources);
