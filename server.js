@@ -66,6 +66,7 @@ io.sockets.on('connection', (socket) => {
 			data.build.owner = indexField;
 			field_list[indexOfMap].place_building(data.build);
 			++player_list[indexPlayer].buildings;
+			player_list[indexPlayer].addBuilding(data.build);
 		});
 		socket.on('upgrade_building', (data) => {
 			if(!(
@@ -81,6 +82,7 @@ io.sockets.on('connection', (socket) => {
 				)) return;
 			field_list[indexOfMap].remove_building(coords);
 			--player_list[indexPlayer].buildings;
+			player_list[indexPlayer].removeBuilding(coords);
 		});
 		socket.on('chunk_send', (chunk) => {
 			console.log(`chunk updated on map ${indexOfMap}: ${chunk}`);
@@ -90,6 +92,7 @@ io.sockets.on('connection', (socket) => {
 			if (indexPlayer === undefined) return;
 			console.log(`player ${socket.id} (map ${indexOfMap}, position ${indexField}) disconnected`);
 			field_list[indexOfMap].remove_player(indexField);
+			player_list[indexPlayer].clearBuildings(indexOfMap);
 			player_list.splice(indexPlayer, 1);
 		});
 	}
@@ -131,6 +134,18 @@ function next_player() {
 function Player(player_id, spawn_point) {
 	var res = new Resources();
 	var capacity = res.sum();
+	var buildingsCoords = [];
+	this.addBuilding = (coords) => {
+		buildingsCoords.push(coords);
+	};
+	this.removeBuilding = (coords) => {
+		buildingsCoords.splice(buildingsCoords.indexOf(coords), 1);
+	};
+	this.clearBuildings = (fieldIndex) => {
+		buildingsCoords.forEach((elem) => {
+			field_list[fieldIndex].remove_building(elem);
+		});
+	};
 	this.getId = () => player_id;
 	this.getSpawn = () => spawn_point;
 	this.getRes = () => {
@@ -160,10 +175,10 @@ function Resources() {
 	var R = resData[0].start_r, G = resData[0].start_g, B = resData[0].start_b, M = resData[0].start_m;
 	this.tryChange = (data, option) => {
 		if (option === undefined) {
-			R += data.r;
-			G += data.g;
-			B += data.b;
-			M += data.m;
+			R += data.r ? data.r : 0;
+			G += data.g ? data.g : 0;
+			B += data.b ? data.b : 0;
+			M += data.m ? data.m : 0;
 			return true;
 		}
 		if (option) {
@@ -185,15 +200,18 @@ function Resources() {
 	this.sum = () => R + G + B;
 }
 function Vessel(maxCapacity) {
-	var R = 0, G = 0, B = 0;
+	this.r = 0;
+	this.g = 0;
+	this.b = 0;
 	this.tryChange = (delta, div) => {
+		let dr, dg, db;
 		with(Math) {
-			let dr = min(floor(delta.r / div), maxCapacity - R - G - B);
-			R += dr;
-			let dg = min(floor(delta.g / div), maxCapacity - R - G - B);
-			G += dg;
-			let db = min(floor(delta.b / div), maxCapacity - R - G - B);
-			B += db;
+			dr = min(floor(delta.r / div), maxCapacity - this.r - this.g - this.b);
+			this.r += dr;
+			dg = min(floor(delta.g / div), maxCapacity - this.r - this.g - this.b);
+			this.g += dg;
+			db = min(floor(delta.b / div), maxCapacity - this.r - this.g - this.b);
+			this.b += db;
 		}
 		return {r: dr, g: dg, b: db};
 	}
@@ -321,24 +339,24 @@ function Field(params, index) {
 	this.getUpgradeCost = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].bui.getUpgradeCost();
 	this.upgrade = (coords) => {
 		var cell = bui[coords.cx][coords.cy][coords.dx][coords.dy];
-		removeInterval(cell.clb);
+		clearInterval(cell.clb);
 		cell.bui.upgrade();
 		cell.clb = setInterval(cell.bui.call, cell.bui.getTime() * msPerTick);
 	};
 	this.remove_building = (crd) => {
 		var cell = bui[crd.cx][crd.cy][crd.dx][crd.dy];
 		
-		removeInterval(cell.clb);
+		clearInterval(cell.clb);
 		
 		cell.bui.neighbours.forEach((elem) => {
-			elem.outputs = elem.outputs.splice(elem.outputs.findIndex(cell.bui), 1);
+			elem.outputs = elem.outputs.splice(elem.outputs.indexOf(cell.bui), 1);
 		});
 		cell.bui.outputs.forEach((elem) => {
-			elem.neighbours = elem.neighbours.splice(elem.neighbours.findIndex(cell.bui), 1);
+			elem.neighbours = elem.neighbours.splice(elem.neighbours.indexOf(cell.bui), 1);
 		});
 		
 		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
-		map[crd.cx][crd.cy].bui[crd.dx][crd.dy] = bui_to_send[crd.cx][crd.cy][crd.dx][crd.dy] = 0;
+		map[crd.cx][crd.cy].bui[crd.dx][crd.dy] = bui_to_send[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
 		
 		this.emit_chunk(crd.cx, crd.cy);
 	};
@@ -405,11 +423,13 @@ function build_replica(info, type) {
 		this.neighbours = [];
 		this.outputs = [];
 		this.product = new Vessel(cap);
+		console.log(this.product);
 		if (info.func.includes("store")) {
 			this.call = () => {
+				console.log(`calling store of ${owner} on ${map}`);
 				let dr = 0, dg = 0, db = 0, tves = this.product;
 				this.neighbours.every((elem) => {
-					if (tves.sum() == cap)
+					if (tves.r + tves.g + tves.b  == cap)
 						return false;
 					let d = tves.tryChange(elem.product, elem.outputs.length);
 					dr += d.r;
@@ -420,10 +440,12 @@ function build_replica(info, type) {
 					elem.product.b -= d.b;
 					return true;
 				});
+				console.log(this.product);
 				player_list[field_list[map].getPlayer(owner)].tryChangeRes({r: dr, g: dg, b: db});
 			};
 		} else if (info.func.includes("sell")) {
 			this.call = () => {
+				console.log(`calling sell of ${owner} on ${map}`);
 				let mass = 0, max_mass = this.inp;
 				this.neighbours.every((elem, i, arr) => {
 					if (mass == max_mass) return false;
@@ -440,6 +462,7 @@ function build_replica(info, type) {
 			};
 		} else {
 			this.call = () => {
+				console.log(`calling production of ${owner} on ${map}`);
 				let mass = {r: 0, g: 0, b: 0}, max_mass = this.inp;
 				this.neighbours.every((elem, i, arr) => {
 					if (mass.r + mass.g + mass.b == max_mass) return false;
@@ -465,6 +488,7 @@ function build_replica(info, type) {
 				this.product.r += Math.floor(mass.r / this.inp * this.out);
 				this.product.g += Math.floor(mass.g / this.inp * this.out);
 				this.product.b += Math.floor(mass.b / this.inp * this.out);
+				console.log(this.product);
 			};
 		}
 		this.upgrade = () => {
