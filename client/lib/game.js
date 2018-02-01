@@ -117,8 +117,26 @@ function GameEnvironment(PIXI, Papa, EE) {
 	var boundsOnMapInPixels, d;
 	var focus, focusVelocity;
 
+	var upperHalf, bottomHalf;
+
 	function getBounds(mapParams, homeCell) {
-		cellSideSizeInPixels = new PIXI.Sprite(texture(img("cell_color0"))).height / 2;
+		let spr = new PIXI.Sprite(texture(img("cell_color0"))),
+			w = spr.width, h = spr.height;
+		
+		cellSideSizeInPixels = h / 2;
+		
+		upperHalf = new PIXI.Polygon(
+			0, h / 4,
+			w / 2, 0,
+			w, h / 4,
+			0, 3 * h / 4
+		);
+		bottomHalf = new PIXI.Polygon(
+			0, 3 * h / 4,
+			w, h / 4,
+			w, 3 * h / 4,
+			w / 2, h
+		);
 
 		mapSizeInCells = (1 << mapParams.logSize) + 1;
 		chunkWidthInCells = mapParams.chunkWidth;
@@ -182,6 +200,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	const menu = [];
+
 	this.addMouseListener = () => {
 		var data;
 
@@ -204,16 +223,17 @@ function GameEnvironment(PIXI, Papa, EE) {
 				dx: offset.getRow(),
 				dy: offset.getCol()
 			};
+			console.log(tmp);
 
 			menu['main_types'].hide();
 			menu['upgrade'].hide();
 			
 			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
-				console.log('open build menu');
-				data = {build: tmp};
-				menu['main_types'].visible = true;
-			} else if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
-				console.log('open upgrade menu');
+				if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
+					data = {build: tmp};
+					menu['main_types'].visible = true;
+				}
+			} else {
 				data = {coords: tmp};
 				menu['upgrade'].visible = true;
 			}
@@ -241,6 +261,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			}
 		});
 		menu['option0'].interactive = true;
+		menu['store_1'].hitArea = menu['option0'].hitArea = upperHalf;
 		menu['option0'].on('mousedown', (event) => {
 			if (state < 2) return;
 			data.option = false;
@@ -248,6 +269,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			tryEmit(data);
 		});
 		menu['option1'].interactive = true;
+		menu['store_0'].hitArea = menu['option1'].hitArea = bottomHalf;
 		menu['option1'].on('mousedown', (event) => {
 			if (state < 2) return;
 			data.option = true;
@@ -263,9 +285,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	function empty(cx, cy, dx, dy) {
-		return !(mapOfChunks[cx][cy].bui && 
-			mapOfChunks[cx][cy].bui[dx] &&
-			mapOfChunks[cx][cy].bui[dx][dy]); 
+		return mapOfChunks[cx][cy].bui == undefined ||
+			   mapOfChunks[cx][cy].bui[dx] == undefined ||
+			   mapOfChunks[cx][cy].bui[dx][dy] == undefined; 
 	};
 
 	function tryEmit(data) {
@@ -364,8 +386,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['option'].visible = false;
 		};
 
-		menu['upgrade_0'].coords = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
-		menu['remove'].coords = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
+		menu['upgrade_0'].position = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
+		menu['remove'].position = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
 		
 		menu['main_types'].addChild(
 			menu['mine'] = sprite('menu_1_0'),
@@ -426,8 +448,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 		menu['prod_b'].y = neighbours[0].getY();
 		
 		menu['store_types'].addChild(
-			menu['store_0'] = sprite('menu_4_1'),
-			menu['store_1'] = sprite('menu_4_2')
+			menu['store_0'] = sprite('menu_4_2'),
+			menu['store_1'] = sprite('menu_4_1')
 		);
 
 		menu['main_types'].hide();
