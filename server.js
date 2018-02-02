@@ -229,7 +229,7 @@ function precedes(fat, son) {
 	return linkData.some((elem) => elem.f == fat && elem.t == son);
 };
 
-const MAX_PLAYERS = 7, msPerTick = 1000;
+const MAX_PLAYERS = 7, msPerTick = 250;
 
 function Field(params, index) {
 	var filled = false,
