@@ -41,17 +41,17 @@ io.sockets.on('connection', (socket) => {
 			linkData = parses[table_names[3]];
 			build_replicas();
 		}
-		var indexPlayer, indexField, indexOfMap;
+		var player, field, idOnField;
 		socket.on('new_player', (data) => {
 			console.log(`new player ${data.id}`);
 			var spawn = next_player();
-			var new_player = new Player(
+			player = new Player(
 				data.id, spawn
 				//another params
 			);
-			spawn.resources = new_player.getRes();
-			player_list.push(new_player);
-			indexField = field_list[indexOfMap = spawn.i].push_player(indexPlayer = player_list.length - 1);
+			spawn.resources = player.getRes();
+			player_list.push(player);
+			idOnField = (field = field_list[spawn.i]).push_player(player);
 			spawn.buiData = buiData;
 			socket.emit('gameDataSend', spawn);
 		});
@@ -59,41 +59,36 @@ io.sockets.on('connection', (socket) => {
 			console.log('build request: ');
 			console.log(data);
 			if (!(
-				(field_list[indexOfMap].reaches(indexField, data.build) || player_list[indexPlayer].buildings == 0) && 
-				field_list[indexOfMap].empty(data.build) && 
-				player_list[indexPlayer].tryChangeRes(getBuildCost(data.build.value), data.option)
+				(field.reaches(idOnField, data.build) || player.buildings == 0) && 
+				field.empty(data.build) && 
+				player.tryChangeRes(getBuildCost(data.build.value), data.option)
 				)) return;
-			data.build.owner = indexField;
-			field_list[indexOfMap].place_building(data.build);
-			++player_list[indexPlayer].buildings;
-			player_list[indexPlayer].addBuilding(data.build);
+			data.build.owner = idOnField;
+			field.place_building(data.build);
+			++player.buildings;
+			player.addBuilding(data.build);
 		});
 		socket.on('upgrade_building', (data) => {
 			if(!(
-				field_list[indexOfMap].owns(indexField, data.coords) &&
-				player_list[indexPlayer].tryChangeRes(field_list[indexOfMap].getUpgradeCost(data.coords), data.option)
+				field.owns(idOnField, data.coords) &&
+				player.tryChangeRes(field.getUpgradeCost(data.coords), data.option)
 				)) return;
-			field_list[indexOfMap].upgrade(data.coords);
+			field.upgrade(data.coords);
 		});
 		socket.on('remove_building', (coords) => {
 			if(!(
-				!field_list[indexOfMap].empty(coords) &&
-				field_list[indexOfMap].owns(indexField, coords)
+				!field.empty(coords) &&
+				field.owns(idOnField, coords)
 				)) return;
-			field_list[indexOfMap].remove_building(coords);
-			--player_list[indexPlayer].buildings;
-			player_list[indexPlayer].removeBuilding(coords);
-		});
-		socket.on('chunk_send', (chunk) => {
-			console.log(`chunk updated on map ${indexOfMap}: ${chunk}`);
-			field_list[indexOfMap].emit_chunk(chunk);
+			field.remove_building(coords);
+			--player.buildings;
+			player.removeBuilding(coords);
 		});
 		socket.on('disconnect', () => {
-			if (indexPlayer === undefined) return;
-			console.log(`player ${socket.id} (map ${indexOfMap}, position ${indexField}) disconnected`);
-			field_list[indexOfMap].remove_player(indexField);
-			player_list[indexPlayer].clearBuildings(indexOfMap);
-			player_list.splice(indexPlayer, 1);
+			if (player === undefined) return;
+			console.log(`player ${socket.id} disconnected`);
+			field.remove_player(player);
+			player_list.splice(player_list.indexOf(player), 1);
 		});
 	}
 });
@@ -141,9 +136,9 @@ function Player(player_id, spawn_point) {
 	this.removeBuilding = (coords) => {
 		buildingsCoords.splice(buildingsCoords.indexOf(coords), 1);
 	};
-	this.clearBuildings = (fieldIndex) => {
+	this.clearBuildings = (field) => {
 		buildingsCoords.forEach((elem) => {
-			field_list[fieldIndex].remove_building(elem);
+			field.remove_building(elem);
 		});
 	};
 	this.getId = () => player_id;
@@ -234,7 +229,7 @@ function precedes(fat, son) {
 	return linkData.some((elem) => elem.f == fat && elem.t == son);
 };
 
-const MAX_PLAYERS = 2, msPerTick = 1000;
+const MAX_PLAYERS = 7, msPerTick = 1000;
 
 function Field(params, index) {
 	var filled = false,
@@ -244,7 +239,8 @@ function Field(params, index) {
 		bui_to_send = [[]],
 		players = [],
 		CE = new coords(42, params.chunkWidth, params.chunkHeight),
-		n = map.length, m = map[0].length;
+		n = map.length, m = map[0].length,
+		lastPlayerId = -1;
 	for (let ci = 0; ci < n; ++ci) {
 		bui[ci] = [];
 		for (let cj = 0; cj < m; ++cj) {
@@ -269,17 +265,18 @@ function Field(params, index) {
 	this.canTake = () => !filled && hasPlace;
 	this.getIndex = () => index;
 	this.emit_chunk = (x, y) => {
-		players.forEach((elem) => io.to(player_list[elem].getId()).emit('chunkUpdated', map[x][y]));
+		players.forEach((elem) => io.to(elem.getId()).emit('chunkUpdated', map[x][y]));
 	};
-	this.push_player = (pl_id) => {
-		players.push(pl_id);
+	this.push_player = (player) => {
+		player.idOnField = ++lastPlayerId;
+		players.push(player);
 		if (players.length >= MAX_PLAYERS) {
 			console.log(`map ${index} filled`);
 			filled = true;
 		}
-		return players.length - 1;
+		return lastPlayerId;
 	};
-	this.getPlayer = (index) => players[index]; 
+	this.getPlayer = (id) => players.find((elem) => elem.idOnField == id); 
 	this.empty = (coords) => {
 		var chunk = map[coords.cx][coords.cy],
 			res = !chunk.bui[coords.dx][coords.dy] && chunk.res[coords.dx][coords.dy] == 0;
@@ -300,9 +297,9 @@ function Field(params, index) {
 		if (!bui_to_send[data.cx][data.cy][data.dx])
 			bui_to_send[data.cx][data.cy][data.dx] = [];
 
-		map[data.cx][data.cy].bui[data.dx][data.dy] = bui_to_send[data.cx][data.cy][data.dx][data.dy] = data.value + "_" + data.owner;
+		map[data.cx][data.cy].bui[data.dx][data.dy] = bui_to_send[data.cx][data.cy][data.dx][data.dy] = data.value + "_" + (data.owner % MAX_PLAYERS);
 		
-		var building = makeBuilding(data.value, data.owner, index);
+		var building = makeBuilding(data.value, this.getPlayer(data.owner), this);
 		
 		var offset = new CE.Offset(data.cx * params.chunkWidth + data.dx, data.cy * params.chunkHeight + data.dy);
 		for (let i = 0; i < 6; ++i) {
@@ -360,8 +357,9 @@ function Field(params, index) {
 		
 		this.emit_chunk(crd.cx, crd.cy);
 	};
-	this.remove_player = (pl_index) => {
-		players.splice(pl_index, 1);
+	this.remove_player = (player) => {
+		player.clearBuildings(this);
+		players.splice(players.indexOf(player), 1);
 		if (players.length < MAX_PLAYERS) {
 			console.log(`map ${index} can take in more players`);
 			filled = false;
@@ -414,7 +412,7 @@ function build_replica(info, type) {
 		out_u = getFunc(info.out_u),
 		cost_u = getFunc(info.cost_u);
 
-	res.create = function(map, owner) {
+	res.create = function(owner) {
 		var time = info.time, cap = info.cap,
 			my_cost = upgrade_cost(cost);
 		this.type = type;
@@ -426,7 +424,6 @@ function build_replica(info, type) {
 		console.log(this.product);
 		if (info.func.includes("store")) {
 			this.call = () => {
-				console.log(`calling store of ${owner} on ${map}`);
 				let dr = 0, dg = 0, db = 0, tves = this.product;
 				this.neighbours.every((elem) => {
 					if (tves.r + tves.g + tves.b  == cap)
@@ -441,11 +438,10 @@ function build_replica(info, type) {
 					return true;
 				});
 				console.log(this.product);
-				player_list[field_list[map].getPlayer(owner)].tryChangeRes({r: dr, g: dg, b: db});
+				owner.tryChangeRes({r: dr, g: dg, b: db});
 			};
 		} else if (info.func.includes("sell")) {
 			this.call = () => {
-				console.log(`calling sell of ${owner} on ${map}`);
 				let mass = 0, max_mass = this.inp;
 				this.neighbours.every((elem, i, arr) => {
 					if (mass == max_mass) return false;
@@ -458,11 +454,10 @@ function build_replica(info, type) {
 					mass += d;
 					return true;
 				});
-				player_list[field_list[map].getPlayer(owner)].tryChangeRes({m: Math.floor(mass / max_mass * this.out)});
+				owner.tryChangeRes({m: Math.floor(mass / max_mass * this.out)});
 			};
 		} else {
 			this.call = () => {
-				console.log(`calling production of ${owner} on ${map}`);
 				let mass = {r: 0, g: 0, b: 0}, max_mass = this.inp;
 				this.neighbours.every((elem, i, arr) => {
 					if (mass.r + mass.g + mass.b == max_mass) return false;
@@ -523,9 +518,10 @@ function getFunc(comm) {
 var add = (num) => (x) => {return x == -1 ? -1 : (x + Number(num));},
 	mul = (num) => (x) => {return x == -1 ? -1 : (x * Number(num));};
 
-function makeBuilding(id, owner, map) {
-	console.log(`making ${id} of ${owner} on ${map}`);
-	return new building_replica[id - 1].create(map, owner);
+function makeBuilding(id, owner) {
+	console.log(`making ${id} of`);
+	console.log(owner);
+	return new building_replica[id - 1].create(owner);
 };
 function getBuildCost(id) {
 	return building_replica[id - 1].getCost();
