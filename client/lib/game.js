@@ -228,14 +228,14 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['main_types'].hide();
 			menu['upgrade'].hide();
 			
-			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
-				if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
+			if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
+				if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
 					data = {build: tmp};
 					menu['main_types'].visible = true;
+				} else {
+					data = {coords: tmp};
+					menu['upgrade'].visible = true;
 				}
-			} else {
-				data = {coords: tmp};
-				menu['upgrade'].visible = true;
 			}
 		}, {passive: true});
 
