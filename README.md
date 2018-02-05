@@ -8,7 +8,7 @@ Dig. Produce. Repeat
 
 ![Somehow this image isn't showing](https://github.com/PaulusUnexpendableTurtle/epic-economy-strategy/blob/master/presentation_img/title.png?raw=true)
 
-DPR - экономический симулятор, вдохновлённый Civilization IV-V-VI, Starcraft I-II и любовью к стратегиям вообще. Планируются single- и multi- player, разработка последнего в приоритете. Игра - на сайте epic-economy-strategy.herokuapp.com .
+DPR - экономический симулятор, вдохновлённый Civilization IV-V-VI, Starcraft I-II и любовью к стратегиям вообще. Планируются single- и multi- player, разработка последнего в приоритете. Поиграть можно [здесь](https://epic-economy-strategy.herokuapp.com).
 
 По ходу разработки
 ------------------
@@ -32,11 +32,6 @@ DPR - экономический симулятор, вдохновлённый 
 В экономических симуляторах игроки создают производства с целью извлечения максимальной прибыли. Гонка за ресурсами приводит игроков к конфликтам интересов, а затем и к вооружённым конфликтам. Сможешь ли ты выжить в этом хаосе?..
 
 Победа достаётся тем, кто удачлив, умеет распоряжаться ограниченным запасом ресурсов и мыслит наперёд.
-
-Как поиграть
-------------
-
-Зайди на сайт epic-economy-strategy.herokuapp.com .
 
 Игра
 ----
