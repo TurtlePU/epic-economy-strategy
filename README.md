@@ -6,6 +6,8 @@ Dig. Produce. Repeat
 Что такое DPR
 -------------
 
+![Somehow this image isn't showing](https://github.com/PaulusUnexpendableTurtle/epic-economy-strategy/blob/master/presentation_img/title.png?raw=true)
+
 DPR - экономический симулятор, вдохновлённый Civilization IV-V-VI, Starcraft I-II и любовью к стратегиям вообще. Планируются single- и multi- player, разработка последнего в приоритете. Игра - на сайте epic-economy-strategy.herokuapp.com .
 
 По ходу разработки
