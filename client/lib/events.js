@@ -1,6 +1,6 @@
 function EventsEnvironment(window, socket, PIXI, Papa) {
 	const EE = this,
-		  GE = new GameEnvironment(PIXI, Papa, EE);
+	      GE = new GameEnvironment(PIXI, Papa, EE);
 	
 	this.start = () => { GE.start(); };
 
@@ -70,9 +70,9 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	}
 
 	const keyLeft = keyboard(65), 
-		  keyRight = keyboard(68), 
-		  keyUp = keyboard(87), 
-		  keyDown = keyboard(83);
+	      keyRight = keyboard(68), 
+	      keyUp = keyboard(87), 
+	      keyDown = keyboard(83);
 
 	function addKeyboardMovement() {
 		var step = 3;

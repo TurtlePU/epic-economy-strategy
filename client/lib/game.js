@@ -50,7 +50,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	var resText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 'black', align : 'center'});
 	this.updateResources = (data) => {
-		resText.text = `R: ${data.r} G: ${data.g} B: ${data.b} M: ${data.m} Cap: ${data.cap}`;
+		resText.text = `R: ${data.r} G: ${data.g} B: ${data.b} M: ${data.m}`;
 	};
 
 	setInterval(velocityTick, 2);
