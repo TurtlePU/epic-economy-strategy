@@ -132,7 +132,14 @@ function Player(player_id, spawn_point) {
 		buildingsCoords.push(coords);
 	};
 	this.removeBuilding = (coords) => {
-		buildingsCoords.splice(buildingsCoords.indexOf(coords), 1);
+		var index = 0;
+		buildingsCoords.some((elem, i, arr) => {
+			if (elem.cx == coords.cx && elem.cy == coords.cy && elem.dx == coords.dx && elem.dy == coords.dy) {
+				index = i;
+				return true;
+			}
+		});
+		buildingsCoords.splice(index, 1);
 	};
 	this.clearBuildings = (field) => {
 		buildingsCoords.forEach((elem) => {
