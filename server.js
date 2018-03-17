@@ -155,16 +155,19 @@ function Player(player_id, spawn_point) {
 		return ret;
 	};
 	this.tryChangeRes = (data, option) => {
-		console.log('trying to pay: ');
+		console.log(`trying to ${option === undefined ? "earn" : "pay"}: `);
 		console.log(data);
-		console.log(`(${option})`);
-		var ans = res.tryChange(data, option);
-		console.log(`paid? ${ans}`);
-		if (ans) {
+		if (!(option === undefined))
+			console.log(`(${option ? "money" : "resources"})`);
+		
+		if (res.tryChange(data, option)) {
+			console.log('transaction succesful');
 			io.to(player_id).emit('resources_updated', this.getRes());
-			//TODO: substract from storages
+			return true;
+		} else {
+			console.log('transaction failed');
+			return false;
 		}
-		return ans;
 	};
 };
 
@@ -296,12 +299,12 @@ function Field(params, index) {
 			if (other === undefined || (other.own >= 0 && other.own != data.owner)) continue;
 			//TODO: add resources to link table
 			if (precedes(data.value, other.val)) {
-				building.outputs.push(other.bui);
-				other.bui.neighbours.push(building);
+				building.push_output(other.bui);
+				other.bui.push_neighbour(building);
 			}
 			if (precedes(other.val, data.value)) {
-				building.neighbours.push(other.bui);
-				other.bui.outputs.push(building);
+				building.push_neighbour(other.bui);
+				other.bui.push_output(building);
 			}
 		}
 
@@ -329,13 +332,8 @@ function Field(params, index) {
 		var cell = bui[crd.cx][crd.cy][crd.dx][crd.dy];
 		
 		clearInterval(cell.clb);
-		
-		cell.bui.neighbours.forEach((elem) => {
-			elem.outputs = elem.outputs.splice(elem.outputs.indexOf(cell.bui), 1);
-		});
-		cell.bui.outputs.forEach((elem) => {
-			elem.neighbours = elem.neighbours.splice(elem.neighbours.indexOf(cell.bui), 1);
-		});
+
+		cell.bui.untie();
 		
 		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
 		map[crd.cx][crd.cy].bui[crd.dx][crd.dy] = bui_to_send[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
@@ -372,5 +370,8 @@ function ResourceSource(type) {
 		g: type == 2 ? resData[0].start_res : 0,
 		b: type == 3 ? resData[0].start_res : 0
 	};
-	this.outputs = [];
+	var outputs = [];
+	this.push_output = (elem) => outputs.push(elem);
+	this.remove_output = (elem) => outputs.splice(outputs.indexOf(elem), 1);
+	this.clients = () => outputs.length;
 };
