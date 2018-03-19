@@ -48,9 +48,26 @@ function GameEnvironment(PIXI, Papa, EE) {
 		updRenderingBounds(zeroPoint);
 	};
 
-	var resText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 'black', align : 'center'});
+	var R_text, G_text, B_text, M_text;
+
+	function shortText(x) {
+		let flr = Math.floor;
+		if (x < 1e4)
+			return `${x}`;
+		if (x < 1e7)
+			return `${flr(x / 1e3)}k`;
+		if (x < 1e10)
+			return `${flr(x / 1e6)}m`;
+		if (x < 1e13)
+			return `${flr(x / 1e9)}b`;
+		return "MANY";
+	}
+
 	this.updateResources = (data) => {
-		resText.text = `R: ${data.r} G: ${data.g} B: ${data.b} M: ${data.m}`;
+		R_text.text = `${shortText(data.r)}`;
+		G_text.text = `${shortText(data.g)}`;
+		B_text.text = `${shortText(data.b)}`;
+		M_text.text = `${shortText(data.m)}`;
 	};
 
 	setInterval(velocityTick, 2);
@@ -63,6 +80,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 	function buildImgPathList() {
 		var res = [];
+		res.push(img(`cell_color01`));
 		for (let i = 0; i < 4; ++i)
 			res.push(img(`cell_color${i}`));
 		for (let i = 1; i < 12; ++i)
@@ -78,6 +96,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 				res.push(img(`menu_${i}_${j}`));
 		res.push(img(`menu_5`));
 		res.push(img(`menu_6`));
+		for (let i = 1; i < 4; ++i)
+			res.push(img(`res_overlay_${i}`));
 		return res;
 	}
 
@@ -337,7 +357,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			return img(`cell_color${mapOfChunks[i][j].res[x][y]}`);
 		if (mapOfChunks[i][j].bui && mapOfChunks[i][j].bui[x] && mapOfChunks[i][j].bui[x][y])
 			return img(`building${mapOfChunks[i][j].bui[x][y]}`);
-		return img('cell_color0');
+		return img('cell_color01');
 	};
 
 	function getSpriteOfCell(i, j, x, y) {
@@ -397,9 +417,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['remove'].visible = true;
 			vidible
 		}
-
-		menu['upgrade_0'].position = new PIXI.Point(neighbours[1].getX(), neighbours[1].getY());
-		menu['remove'].position = new PIXI.Point(neighbours[5].getX(), neighbours[5].getY());
 		
 		menu['main_types'].addChild(
 			menu['mine'] = sprite('menu_1_0'),
@@ -425,6 +442,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 		let shift_zeroOffset = new CE_overlay.Offset(0, 0), shift_neighbours = [];
 		for (let i = 0; i < 6; ++i)
 			shift_neighbours[i] = shift_zeroOffset.getNeighbor(i).toPoint();
+
+		menu['upgrade_0'].position = new PIXI.Point(shift_neighbours[1].getX(), shift_neighbours[1].getY());
+		menu['remove'].position = new PIXI.Point(shift_neighbours[5].getX(), shift_neighbours[5].getY());
 
 		menu['mine_types'].x = menu['mine_types'].x + (menu['mine'].x = shift_neighbours[3].getX());
 		menu['mine_types'].y = menu['mine_types'].y + (menu['mine'].y = shift_neighbours[3].getY());
@@ -479,8 +499,62 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 		updateOverlayCoords();
 
+		//overlay.addChild(resText);
+		let R_pict = new PIXI.Sprite(texture(img("res_overlay_1"))),
+		    G_pict = new PIXI.Sprite(texture(img("res_overlay_2"))),
+		    B_pict = new PIXI.Sprite(texture(img("res_overlay_3"))),
+		    M_pict = new PIXI.Sprite(texture(img("res_overlay_1")));
+
+		let h = R_pict.height, pad = h / 4;
+
+		var Font = { font : `${h}px Arial`, fill : `green`, stroke : `black`, strokeThickness : 1 };
+
+		R_text = new PIXI.Text('', Font);
+		G_text = new PIXI.Text('', Font);
+		B_text = new PIXI.Text('', Font);
+		M_text = new PIXI.Text('', Font);
+
+		R_text.resolution =
+		G_text.resolution =
+		B_text.resolution =
+		M_text.resolution = 2;
+
+		R_text.updateText();
+		G_text.updateText();
+		B_text.updateText();
+		M_text.updateText();
+		
 		GE.updateResources(resources);
-		overlay.addChild(resText);
+
+		R_pict.x = G_pict.x = B_pict.x = M_pict.x = pad;
+		R_text.x = G_text.x = B_text.x = M_text.x = h + 2 * pad;
+
+		let delta = (h - R_text.height) / 2;
+
+		R_text.y = (R_pict.y = pad) + delta;
+		G_text.y = (G_pict.y = h + 2 * pad) + delta;
+		B_text.y = (B_pict.y = 2 * h + 3 * pad) + delta;
+		M_text.y = (M_pict.y = 3 * h + 4 * pad) + delta;
+
+		let w = new PIXI.Text("9999m", Font).width;
+
+		let graphics = new PIXI.Graphics();
+
+		graphics.beginFill(0x000000);
+		graphics.lineStyle(5, 0x000000, 1);
+
+		graphics.moveTo(0, 0);
+		graphics.lineTo(w + h + 3 * pad, 0);
+		graphics.lineTo(w + h + 3 * pad, 4 * h + 5 * pad);
+		graphics.lineTo(0, 4 * h + 5 * pad);
+		graphics.lineTo(0, 0);
+		graphics.endFill();
+
+		overlay.addChild(graphics);
+
+		overlay.addChild(
+			R_pict, G_pict, B_pict, M_pict, 
+			R_text, G_text, B_text, M_text);
 	};
 	function updateOverlayCoords() {
 		menu['0'].x = d.getX();
