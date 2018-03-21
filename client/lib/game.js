@@ -507,7 +507,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 		let h = R_pict.height, pad = h / 4;
 
-		var Font = { font : `${h}px Arial`, fill : `green`, stroke : `black`, strokeThickness : 1 };
+		var Font = { font : `${h}px Arial`, fill : 0x00FF00 };
 
 		R_text = new PIXI.Text('', Font);
 		G_text = new PIXI.Text('', Font);
@@ -541,13 +541,14 @@ function GameEnvironment(PIXI, Papa, EE) {
 		let graphics = new PIXI.Graphics();
 
 		graphics.beginFill(0x000000);
-		graphics.lineStyle(5, 0x000000, 1);
+		graphics.lineStyle(5, 0x00FF00, 1);
 
-		graphics.moveTo(0, 0);
-		graphics.lineTo(w + h + 3 * pad, 0);
-		graphics.lineTo(w + h + 3 * pad, 4 * h + 5 * pad);
-		graphics.lineTo(0, 4 * h + 5 * pad);
-		graphics.lineTo(0, 0);
+		let margin = 2.5;
+		graphics.moveTo(0 + margin, 0 + margin);
+		graphics.lineTo(w + h + 3 * pad + margin, 0 + margin);
+		graphics.lineTo(w + h + 3 * pad + margin, 4 * h + 5 * pad + margin);
+		graphics.lineTo(0 + margin, 4 * h + 5 * pad + margin);
+		graphics.lineTo(0 + margin, 0 + margin);
 		graphics.endFill();
 
 		overlay.addChild(graphics);
