@@ -12,39 +12,46 @@ var PseudoRandom = function(a, b, c, mod, elem) {
 };
 
 var MapGen = {
-	buildChunked: function(data) {
-		var chunks = [];
-		let size = (1 << data.logSize) + 1;
-		let w = data.chunkWidth, h = data.chunkHeight;
-		let arr_w = Math.ceil(size / w), arr_h = Math.ceil(size / h);
-		
-		for (let i = 0; i < arr_w; ++i) {
-			chunks[i] = [];
-			for (let j = 0; j < arr_h; ++j)
-				chunks[i][j] = {
-					x: i, y: j,
-					res: [[]],
-					//smth with buildings
-				};
-		}
-		
-		let map = this.__distributed_resource_map(data);
+	pack: function(array, chunkWidth, chunkHeight) {
+		let sx = array.length, sy = array[0].length;
+		let w = Math.ceil(sx / chunkWidth), h = Math.ceil(sy / chunkHeight);
 
-		with(Math) {
-			for (let i = 0; i < size; ++i) {
-				let chunk_i = floor(i / w);
-				let dep_i = i - chunk_i * w;
-				for (let j = 0; j < size; ++j) {
-					let chunk_j = floor(j / h);
-					let dep_j = j - chunk_j * h;
-					if (chunks[chunk_i][chunk_j].res[dep_i] == undefined) {
-						chunks[chunk_i][chunk_j].res[dep_i] = [];
-					}
-					chunks[chunk_i][chunk_j].res[dep_i][dep_j] = map[i][j];
-				}
+		var res = [];
+		for (let i = 0; i < w; ++i) {
+			res[i] = [];
+			for (let j = 0; j < h; ++j) {
+				res[i][j] = {
+					x: i, y: j,
+					res: [[]]
+				};
 			}
 		}
-		return chunks;
+
+		let floor = Math.floor;
+		for (let i = 0; i < sx; ++i) {
+			let chunk_i = floor(i / chunkWidth),
+			    dep_i = i - chunk_i * chunkWidth;
+			for (let j = 0; j < sx; ++j) {
+				let chunk_j = floor(j / chunkHeight),
+				    dep_j = j - chunk_j * chunkHeight;
+				if (res[chunk_i][chunk_j].res[dep_i] === undefined)
+					res[chunk_i][chunk_j].res[dep_i] = [];
+				res[chunk_i][chunk_j].res[dep_i][dep_j] = array[i][j];
+			}
+		}
+
+		return res;
+	},
+	buildChunked: function(data) { return this.pack(this.__distributed_resource_map(data), data.chunkWidth, data.chunkHeight); },
+	chunkedDS: function(pack) { 
+		return this.pack(
+			this.diamondSquare(
+				pack.a, pack.b, pack.c, pack.mod, pack.seed, 
+				pack.logSize, pack.height
+			), 
+			pack.chunkWidth, 
+			pack.chunkHeight
+		); 
 	},
 	__distributed_resource_map: function(pack) {
 		var map = this.__resource_map(pack);
