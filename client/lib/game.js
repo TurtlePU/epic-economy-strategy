@@ -2,7 +2,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 	const gl = new PIXI.autoDetectRenderer(256, 256),
 	      imagePathList = buildImgPathList(),
 	      GE = this;
-	
+
+	var initialWidth;
+
 	this.start = () => {
 		sayHello();
 		resizeRenderer();
@@ -37,10 +39,20 @@ function GameEnvironment(PIXI, Papa, EE) {
 		gl.render(content);
 
 		updRenderingBounds(zeroPoint);
+		
+		var scale = 'scale(1)';
+		document.body.style.webkitTransform = scale; // Chrome, Opera, Safari
+		document.body.style.msTransform = scale; // IE 9
+		document.body.style.transform = scale; // General
+		initialWidth = document.innerWidth;
+	
+		console.log(initialWidth);
+
 		++state;
 	};
 
-	var mapOfChunks = [[]];
+	var mapOfChunks = [[]], heightMap;
+	var maxHeight;
 	this.updateChunk = (chunk) => {
 		console.log("chunk updated");
 		mapOfChunks[chunk.x][chunk.y] = chunk;
@@ -80,9 +92,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 	function buildImgPathList() {
 		var res = [];
-		res.push(img(`cell_color01`));
-		for (let i = 0; i < 4; ++i)
-			res.push(img(`cell_color${i}`));
+		for (let i = 1; i < 4; ++i)
+			res.push(img(`res_color${i}`));
+		for (let i = 1; i < 4; ++i)
+			res.push(img(`cell_color0${i}`));
 		for (let i = 1; i < 12; ++i)
 			for (let j = 0; j < 7; ++j)
 				res.push(img(`building${i}_${j}`));
@@ -96,7 +109,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 				res.push(img(`menu_${i}_${j}`));
 		res.push(img(`menu_5`));
 		res.push(img(`menu_6`));
-		for (let i = 1; i < 4; ++i)
+		for (let i = 1; i < 5; ++i)
 			res.push(img(`res_overlay_${i}`));
 		return res;
 	}
@@ -140,7 +153,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	var upperHalf, bottomHalf;
 
 	function getBounds(mapParams, homeCell) {
-		let spr = new PIXI.Sprite(texture(img("cell_color0"))),
+		let spr = new PIXI.Sprite(texture(img("cell_color02"))),
 		    w = spr.width, h = spr.height;
 		
 		cellSideSizeInPixels = h / 2;
@@ -193,6 +206,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	function fillMap(mapParams, buildings) {
 		mapOfChunks = MapGen.buildChunked(mapParams);
+		heightMap = MapGen.chunkedDS(mapParams);
+		maxHeight = mapParams.height;
 		console.log(buildings);
 		if (buildings.length) {
 			for (let i = 0; i < mapWidthInChunks; ++i) {
@@ -207,8 +222,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	this.resize = (window) => (event) => {
 		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
-		updateOverlayCoords();
-		focus = boundsOnMapInPixels.topLeft.add(d);
+		if (initialWidth == undefined)
+			initialWidth = window.innerWidth;
+		updateOverlayCoords(window.innerWidth / initialWidth);
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
 	};
@@ -343,30 +359,46 @@ function GameEnvironment(PIXI, Papa, EE) {
 			for (let y = 0; y < chunkHeightInCells; ++y) {
 				var cellSprite = getSpriteOfCell(i, j, x, y),
 				    pc = new CE.Offset(x, y).toPoint();
-				cellSprite.x = pc.getX();
-				cellSprite.y = pc.getY();
-				chunkContainers[i][j].addChild(cellSprite);
+				cellSprite.forEach((elem) => {
+					elem.x = pc.getX();
+					elem.y = pc.getY();
+					chunkContainers[i][j].addChild(elem);
+				});
 			}
 		}
 		stage.addChild(chunkContainers[i][j]);
 	};
 
+	function height(val) {
+		let ratio = val / maxHeight;
+		if (ratio < -0.5)
+			return 1;
+		if (ratio > 0.5)
+			return 3;
+		return 2;
+	}
+
 	function getPathOfCellImage(i, j, x, y) {
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
 		if (mapOfChunks[i][j].res[x][y])
-			return img(`cell_color${mapOfChunks[i][j].res[x][y]}`);
+			return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`), img(`res_color${mapOfChunks[i][j].res[x][y]}`)];
 		if (mapOfChunks[i][j].bui && mapOfChunks[i][j].bui[x] && mapOfChunks[i][j].bui[x][y])
-			return img(`building${mapOfChunks[i][j].bui[x][y]}`);
-		return img('cell_color01');
+			return [img(`building${mapOfChunks[i][j].bui[x][y]}`)];
+		return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`)];
 	};
 
 	function getSpriteOfCell(i, j, x, y) {
-		return new PIXI.Sprite(texture(getPathOfCellImage(i, j, x, y)));
+		let res = [];
+		let t = getPathOfCellImage(i, j, x, y);
+		t.forEach((elem) => res.push(new PIXI.Sprite(texture(elem))));
+		return res;
 	};
 
 	function sprite(name) {
 		return new PIXI.Sprite(texture(img(name)));
 	}
+
+	var resourceRect;
 
 	function drawOverlay(resources) {
 		overlay.addChild(menu['0'] = new PIXI.Container());
@@ -415,8 +447,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['upgrade'].visible = true;
 			menu['upgrade_0'].visible = true;
 			menu['remove'].visible = true;
-			vidible
-		}
+		};
 		
 		menu['main_types'].addChild(
 			menu['mine'] = sprite('menu_1_0'),
@@ -437,7 +468,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			menu['prod'].visible = true;
 			menu['sell'].visible = true;
 			menu['store'].visible = true;
-		}
+		};
 
 		let shift_zeroOffset = new CE_overlay.Offset(0, 0), shift_neighbours = [];
 		for (let i = 0; i < 6; ++i)
@@ -497,15 +528,13 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 		menu['0'].hide();
 
-		updateOverlayCoords();
-
 		//overlay.addChild(resText);
 		let R_pict = new PIXI.Sprite(texture(img("res_overlay_1"))),
 		    G_pict = new PIXI.Sprite(texture(img("res_overlay_2"))),
 		    B_pict = new PIXI.Sprite(texture(img("res_overlay_3"))),
-		    M_pict = new PIXI.Sprite(texture(img("res_overlay_1")));
+		    M_pict = new PIXI.Sprite(texture(img("res_overlay_4")));
 
-		let h = R_pict.height, pad = h / 4;
+		let h = R_pict.height, pad = 0;
 
 		var Font = { font : `${h}px Arial`, fill : 0x00FF00 };
 
@@ -526,40 +555,63 @@ function GameEnvironment(PIXI, Papa, EE) {
 		
 		GE.updateResources(resources);
 
-		R_pict.x = G_pict.x = B_pict.x = M_pict.x = pad;
-		R_text.x = G_text.x = B_text.x = M_text.x = h + 2 * pad;
+		let w = new PIXI.Text("9999m", Font).width;
+		let width = (w + h + pad * 2) * 4 + pad, height = h + 2 * pad, shift = (window.innerWidth - width) / 2;
+		let margin = 0;
+
+		//R_pict.x = G_pict.x = B_pict.x = M_pict.x = pad;
+		//R_text.x = G_text.x = B_text.x = M_text.x = h + 2 * pad;
+
+		R_pict.x = pad + margin;
+		R_text.x = R_pict.x + h + pad;
+
+		G_pict.x = R_text.x + w + pad;
+		G_text.x = G_pict.x + h + pad;
+
+		B_pict.x = G_text.x + w + pad;
+		B_text.x = B_pict.x + h + pad;
+
+		M_pict.x = B_text.x + w + pad;
+		M_text.x = M_pict.x + h + pad;
 
 		let delta = (h - R_text.height) / 2;
 
-		R_text.y = (R_pict.y = pad) + delta;
-		G_text.y = (G_pict.y = h + 2 * pad) + delta;
-		B_text.y = (B_pict.y = 2 * h + 3 * pad) + delta;
-		M_text.y = (M_pict.y = 3 * h + 4 * pad) + delta;
+		//R_text.y = (R_pict.y = pad) + delta;
+		//G_text.y = (G_pict.y = h + 2 * pad) + delta;
+		//B_text.y = (B_pict.y = 2 * h + 3 * pad) + delta;
+		//M_text.y = (M_pict.y = 3 * h + 4 * pad) + delta;
 
-		let w = new PIXI.Text("9999m", Font).width;
+		R_text.y = G_text.y = B_text.y = M_text.y = (R_pict.y = G_pict.y = B_pict.y = M_pict.y = pad + margin) + delta;
 
 		let graphics = new PIXI.Graphics();
 
-		graphics.beginFill(0x000000);
-		graphics.lineStyle(5, 0x00FF00, 1);
+		graphics.beginFill(0x000000, 0.5);
+		graphics.lineStyle(margin * 2, 0x00FF00, 1);
 
-		let margin = 2.5;
 		graphics.moveTo(0 + margin, 0 + margin);
-		graphics.lineTo(w + h + 3 * pad + margin, 0 + margin);
-		graphics.lineTo(w + h + 3 * pad + margin, 4 * h + 5 * pad + margin);
-		graphics.lineTo(0 + margin, 4 * h + 5 * pad + margin);
+		graphics.lineTo(width + margin, 0 + margin);
+		graphics.lineTo(width + margin, height + margin);
+		graphics.lineTo(0 + margin, height + margin);
 		graphics.lineTo(0 + margin, 0 + margin);
 		graphics.endFill();
 
-		overlay.addChild(graphics);
-
-		overlay.addChild(
+		resourceRect = new PIXI.Sprite();
+		resourceRect.x = 0;
+		resourceRect.y = 0;
+		resourceRect.addChild(
+			graphics,
 			R_pict, G_pict, B_pict, M_pict, 
 			R_text, G_text, B_text, M_text);
+		resourceRect.mywidth = width;
+		
+		overlay.addChild(resourceRect);
+
+		updateOverlayCoords(1);
 	};
-	function updateOverlayCoords() {
-		menu['0'].x = d.getX();
+	function updateOverlayCoords(scale) {
+		resourceRect.x = (menu['0'].x = d.getX()) - resourceRect.mywidth * scale / 2;
 		menu['0'].y = d.getY();
+		resourceRect.scale.x = menu['0'].scale.x = resourceRect.scale.y = menu['0'].scale.y = scale;
 	};
 
 	function velocityTick() {
