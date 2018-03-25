@@ -94,7 +94,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		var res = [];
 		for (let i = 1; i < 4; ++i)
 			res.push(img(`res_color${i}`));
-		for (let i = 1; i < 4; ++i)
+		for (let i = 1; i < 5; ++i)
 			res.push(img(`cell_color0${i}`));
 		for (let i = 1; i < 12; ++i)
 			for (let j = 0; j < 7; ++j)
@@ -373,9 +373,11 @@ function GameEnvironment(PIXI, Papa, EE) {
 		let ratio = val / maxHeight;
 		if (ratio < -0.5)
 			return 1;
-		if (ratio > 0.5)
+		if (ratio < 0)
+			return 2;
+		if (ratio < 0.5)
 			return 3;
-		return 2;
+		return 4;
 	}
 
 	function getPathOfCellImage(i, j, x, y) {
