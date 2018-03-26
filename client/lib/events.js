@@ -18,7 +18,7 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	socket.on('gameDataSend', function(gameData) {
 		console.log("game data send");
 		GE.build(gameData);
-		addResizeListener();
+		//addResizeListener();
 		addKeyboardMovement();
 		GE.addMouseListener();
 	});
@@ -75,7 +75,7 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	      keyDown = keyboard(83);
 
 	function addKeyboardMovement() {
-		var step = 3;
+		var step = 1;
 		keyLeft.press = keyRight.release = GE.moveScreenByPoint(-step, 0);
 		keyRight.press = keyLeft.release = GE.moveScreenByPoint(step, 0);
 		keyUp.press = keyDown.release = GE.moveScreenByPoint(0, -step);
