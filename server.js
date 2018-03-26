@@ -358,6 +358,7 @@ function Field(params, index) {
 			}, 
 			i: index, 
 			mapParams: {
+				compressed: params,
 				height: params.height,
 				resourceMap: map,
 				heightMap: heightMap
