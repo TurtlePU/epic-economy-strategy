@@ -31,10 +31,10 @@ var MapGen = {
 		for (let i = 0; i < sx; ++i) {
 			let chunk_i = floor(i / chunkWidth),
 			    dep_i = i - chunk_i * chunkWidth;
-			for (let j = 0; j < sx; ++j) {
+			for (let j = 0; j < sy; ++j) {
 				let chunk_j = floor(j / chunkHeight),
 				    dep_j = j - chunk_j * chunkHeight;
-				if (res[chunk_i][chunk_j].res[dep_i] === undefined)
+				if (res[chunk_i][chunk_j].res[dep_i] == undefined)
 					res[chunk_i][chunk_j].res[dep_i] = [];
 				res[chunk_i][chunk_j].res[dep_i][dep_j] = array[i][j];
 			}
@@ -44,6 +44,7 @@ var MapGen = {
 	},
 	buildChunked: function(data) { return this.pack(this.__distributed_resource_map(data), data.chunkWidth, data.chunkHeight); },
 	chunkedDS: function(pack) { 
+		console.log(pack);
 		return this.pack(
 			this.diamondSquare(
 				pack.a, pack.b, pack.c, pack.mod, pack.seed, 
