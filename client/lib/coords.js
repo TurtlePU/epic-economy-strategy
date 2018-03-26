@@ -139,6 +139,9 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
         this.mid = function(point) {
             return new CE.Point((x + point.getX()) / 2, (y + point.getY()) / 2);
         };
+        this.mul = function(k) {
+            return new CE.Point(k * x, k * y);
+        };
 
         this.getCorner = function(direction) {
             with (Math) {
