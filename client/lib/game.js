@@ -41,6 +41,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		updRenderingBounds(zeroPoint);
 
 		++state;
+		console.log("GE.build finished");
 	};
 
 	var mapOfChunks = [[]], heightMap;
@@ -197,10 +198,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	function fillMap(mapParams, buildings) {
-		mapOfChunks = MapGen.buildChunked(mapParams);
-		heightMap = MapGen.chunkedDS(mapParams);
+		mapOfChunks = mapParams.resourceMap;
+		heightMap = mapParams.heightMap;
 		maxHeight = mapParams.height;
-		console.log(buildings);
+		//console.log(buildings);
 		if (buildings.length) {
 			for (let i = 0; i < mapWidthInChunks; ++i) {
 				if (!buildings[i]) continue;

@@ -223,6 +223,7 @@ function Field(params, index) {
 	var filled = false,
 		hasPlace = true,
 		map = map_gen.buildChunked(params),
+		heightMap = map_gen.chunkedDS(params),
 		bui = [[]],
 		bui_to_send = [[]],
 		players = [],
@@ -356,7 +357,11 @@ function Field(params, index) {
 				col: 16 
 			}, 
 			i: index, 
-			mapParams: params,
+			mapParams: {
+				height: params.height,
+				resourceMap: map,
+				heightMap: heightMap
+			},
 			buildings: bui_to_send
 		};
 	};
