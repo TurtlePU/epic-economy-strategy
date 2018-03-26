@@ -1,5 +1,5 @@
 function GameEnvironment(PIXI, Papa, EE) {
-	const gl = new PIXI.autoDetectRenderer(256, 256),
+	const gl = new PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight),
 	      imagePathList = buildImgPathList(),
 	      GE = this;
 
@@ -7,7 +7,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	this.start = () => {
 		sayHello();
-		resizeRenderer();
 		document.body.appendChild(gl.view);
 		PIXI.loader
 			.add(imagePathList)
@@ -27,7 +26,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	this.build = (gameData) => {
 		buildInfo = gameData.buiData;
 
-		getBounds(gameData.mapParams, gameData.homeCell);
+		getBounds(gameData.mapParams.compressed, gameData.homeCell);
 		fillMap(gameData.mapParams, gameData.buildings);
 
 		fillSpriteArray();
@@ -36,11 +35,16 @@ function GameEnvironment(PIXI, Papa, EE) {
 		drawOverlay(gameData.resources);
 		content.addChild(overlay);
 
-		gl.render(content);
-
 		updRenderingBounds(zeroPoint);
 
+		resizeRenderer();
+
 		++state;
+
+		if (state == 2 && lastTime == undefined) {
+			lastTime = new Date();
+			velocityTick(new Date());
+		}
 		console.log("GE.build finished");
 	};
 
@@ -75,7 +79,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		M_text.text = `${shortText(data.m)}`;
 	};
 
-	setInterval(velocityTick, 2);
+	//setInterval(velocityTick, 20);
 
 	function texture(path) {
 		return PIXI.loader.resources[path].texture;
@@ -107,9 +111,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 		return res;
 	}
 
-	function resizeRenderer() {
+	function resizeRenderer() { 
 		gl.autoResize = true;
 		gl.resize(window.innerWidth, window.innerHeight);
+		gl.render(content); 
 	};
 
 	function sayHello() {
@@ -124,13 +129,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 	function showProgress(loader, resource) {
 		console.log("loading...");
 		//TODO: Normal progress bar
-		if (!progressText) {
-			progressText = new PIXI.Text('', {fontFamily : 'Arial', fontSize: 24, fill : 'white', align : 'center'});
-			let tmp = new PIXI.Container();
-			tmp.addChild(progressText);
-			gl.render(tmp);
-		}
-		progressText.text = `Progress: ${loader.progress}%`;
 	};
 
 	var cellSideSizeInPixels;
@@ -221,6 +219,19 @@ function GameEnvironment(PIXI, Papa, EE) {
 		updateOverlayCoords(window.innerWidth / initialWidth);
 		stage.x = -focus.getX() + d.getX();
 		stage.y = -focus.getY() + d.getY();
+		resizeRenderer();
+	};
+
+	function trueResize() {
+		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
+		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		if (initialWidth == undefined)
+			initialWidth = window.innerWidth;
+		updateOverlayCoords(window.innerWidth / initialWidth);
+		stage.x = -focus.getX() + d.getX();
+		stage.y = -focus.getY() + d.getY();
+		resizeRenderer();
+		console.log(`resize`);
 	};
 
 	this.moveScreenByPoint = (x, y) => {
@@ -270,6 +281,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 					menu['upgrade'].show();
 				}
 			}
+
+			boundsOnMapInPixels.pushFocus();
+			updRenderingBounds(zeroPoint);
 		}, {passive: true});
 
 		Papa.parse('./client/res/build-menu-links-table.csv', {
@@ -290,6 +304,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 			},
 			complete: function(result) {
 				++state;
+				if (state == 2 && lastTime == undefined) {
+					lastTime = new Date();
+					velocityTick(new Date());
+				}
 				console.log('parse finished');
 			}
 		});
@@ -609,13 +627,24 @@ function GameEnvironment(PIXI, Papa, EE) {
 		resourceRect.scale.x = menu['0'].scale.x = resourceRect.scale.y = menu['0'].scale.y = scale;
 	};
 
-	function velocityTick() {
-		if (state == 2) {
-			focus = focus.add(focusVelocity);
+	var lastTime;
+	function velocityTick(time) {
+		var dt = time - lastTime;
+		lastTime = time;
+		if (state == 2 && !focusVelocity.equals(zeroPoint)) {
+			console.log(`render for ${dt}ms`);
+			focus = focus.add(focusVelocity.mul(dt));
 			boundsOnMapInPixels.pushFocus();
-			updRenderingBounds(focusVelocity);
+			updRenderingBounds(focusVelocity.mul(dt));
 		}
-		resizeRenderer();
+		if (window.innerWidth / 2 != d.getX()) {
+			trueResize();
+			if (focusVelocity.equals(zeroPoint)) {
+				boundsOnMapInPixels.pushFocus();
+				updRenderingBounds(zeroPoint);
+			}
+		}
+		requestAnimationFrame(velocityTick);
 	};
 
 	function updRenderingBounds(delta) {
