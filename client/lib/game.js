@@ -77,6 +77,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		G_text.text = `${shortText(data.g)}`;
 		B_text.text = `${shortText(data.b)}`;
 		M_text.text = `${shortText(data.m)}`;
+		gl.render(content);
 	};
 
 	//setInterval(velocityTick, 20);
@@ -300,6 +301,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 					menu[elem.next].visible = true;
 					if (data.build)
 						data.build.value = elem.value;
+					gl.render(content);
 				});
 			},
 			complete: function(result) {
@@ -318,6 +320,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 			data.option = false;
 			menu['0'].hide();
 			tryEmit(data);
+			gl.render(content);
 		});
 		menu['option1'].interactive = true;
 		menu['store_0'].hitArea = menu['option1'].hitArea = bottomHalf;
@@ -326,12 +329,14 @@ function GameEnvironment(PIXI, Papa, EE) {
 			data.option = true;
 			menu['0'].hide();
 			tryEmit(data);
+			gl.render(content);
 		});
 		menu['remove'].interactive = true;
 		menu['remove'].on('mousedown', (event) => {
 			if (state < 2) return;
 			menu['0'].hide();
 			EE.emitRemoveBuilding(data.coords);
+			gl.render(content);
 		});
 	};
 
