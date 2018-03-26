@@ -3,7 +3,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	      imagePathList = buildImgPathList(),
 	      GE = this;
 
-	var initialWidth;
+	var initialWidth = undefined;
 
 	this.start = () => {
 		sayHello();
@@ -39,14 +39,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		gl.render(content);
 
 		updRenderingBounds(zeroPoint);
-		
-		var scale = 'scale(1)';
-		document.body.style.webkitTransform = scale; // Chrome, Opera, Safari
-		document.body.style.msTransform = scale; // IE 9
-		document.body.style.transform = scale; // General
-		initialWidth = document.innerWidth;
-	
-		console.log(initialWidth);
 
 		++state;
 	};
@@ -94,7 +86,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		var res = [];
 		for (let i = 1; i < 4; ++i)
 			res.push(img(`res_color${i}`));
-		for (let i = 1; i < 5; ++i)
+		for (let i = 1; i < 11; ++i)
 			res.push(img(`cell_color0${i}`));
 		for (let i = 1; i < 12; ++i)
 			for (let j = 0; j < 7; ++j)
@@ -221,6 +213,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	this.resize = (window) => (event) => {
+		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
 		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
 		if (initialWidth == undefined)
 			initialWidth = window.innerWidth;
@@ -230,9 +223,11 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	this.moveScreenByPoint = (x, y) => {
+		if (initialWidth == undefined)
+			initialWidth = window.innerWidth;
 		var move = new CE.Point(x, y);
 		return () => {
-			focusVelocity = focusVelocity.add(move);
+			focusVelocity = focusVelocity.add(move.mul(window.innerWidth / initialWidth));
 		}
 	};
 
@@ -370,17 +365,16 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	function height(val) {
-		let ratio = val / maxHeight;
-		if (ratio < -0.5)
-			return 1;
-		if (ratio < 0)
-			return 2;
-		if (ratio < 0.5)
-			return 3;
-		return 4;
+		with(Math) {
+			var ret = min(10, max(5 - floor(val / maxHeight * 4), 1));
+			console.log(ret);
+			return ret;
+		}
 	}
 
 	function getPathOfCellImage(i, j, x, y) {
+		console.log(`${i} ${j} ${x} ${y}`);
+		if (heightMap[i][j].res[x] === undefined || heightMap[i][j].res[x][y] === undefined) return [];
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
 		if (mapOfChunks[i][j].res[x][y])
 			return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`), img(`res_color${mapOfChunks[i][j].res[x][y]}`)];
