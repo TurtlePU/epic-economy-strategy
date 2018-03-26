@@ -367,13 +367,11 @@ function GameEnvironment(PIXI, Papa, EE) {
 	function height(val) {
 		with(Math) {
 			var ret = min(10, max(5 - floor(val / maxHeight * 4), 1));
-			console.log(ret);
 			return ret;
 		}
 	}
 
 	function getPathOfCellImage(i, j, x, y) {
-		console.log(`${i} ${j} ${x} ${y}`);
 		if (heightMap[i][j].res[x] === undefined || heightMap[i][j].res[x][y] === undefined) return [];
 		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
 		if (mapOfChunks[i][j].res[x][y])
