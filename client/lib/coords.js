@@ -143,6 +143,10 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
             return new CE.Point(k * x, k * y);
         };
 
+        this.equals = function(point) {
+            return x == point.getX() && y == point.getY();
+        }
+
         this.getCorner = function(direction) {
             with (Math) {
                 var angle = PI * direction / 3 + PI / 6;
