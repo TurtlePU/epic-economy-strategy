@@ -220,32 +220,49 @@ function precedes(fat, son) {
 const MAX_PLAYERS = 7, msPerTick = 250;
 
 function Field(params, index) {
+	let tmp = map_gen.buildChunked(params);
 	var filled = false,
 		hasPlace = true,
-		map = map_gen.buildChunked(params),
+		map = [],
 		heightMap = map_gen.chunkedDS(params),
-		bui = [[]],
-		bui_to_send = [[]],
+		bui = [],
 		players = [],
 		CE = new coords(42, params.chunkWidth, params.chunkHeight),
-		n = map.length, m = map[0].length,
+		n = tmp.length, m = tmp[0].length,
 		lastPlayerId = -1;
 	for (let ci = 0; ci < n; ++ci) {
 		bui[ci] = [];
 		for (let cj = 0; cj < m; ++cj) {
 			bui[ci][cj] = [];
-			map[ci][cj].bui = [];
-			for (let i = 0; i < params.chunkWidth && map[ci][cj].res[i]; ++i) {
+			for (let i = 0; i < params.chunkWidth && tmp[ci][cj].res[i]; ++i) {
 				bui[ci][cj][i] = [];
-				map[ci][cj].bui[i] = [];
 				for (let j = 0; j < params.chunkHeight; ++j) {
-					if (map[ci][cj].res[i][j]) {
+					if (tmp[ci][cj].res[i][j]) {
 						bui[ci][cj][i][j] = {
-							bui: new ResourceSource(map[ci][cj].res[i][j]),
-							val: -map[ci][cj].res[i][j],
-							own: -1
+							bui: new ResourceSource(
+								tmp[ci][cj].res[i][j], 
+								this, 
+								{
+									cx : ci, 
+									cy: cj, 
+									dx: i, 
+									dy: j
+								}
+							),
+							val: -tmp[ci][cj].res[i][j],
+							own: -1,
+							clb: undefined
 						};
-						map[ci][cj].bui[i][j] = `${-map[ci][cj].res[i][j]}_-1`;
+						if (!map[ci])
+							map[ci] = [];
+						if (!map[ci][cj])
+							map[ci][cj] = {
+								x: ci, y: cj,
+								arr: []
+							};
+						if (!map[ci][cj].arr[i])
+							map[ci][cj].arr[i] = [];
+						map[ci][cj].arr[i][j] = `${-tmp[ci][cj].res[i][j]}_-1`;
 					}
 				}
 			}
@@ -267,8 +284,15 @@ function Field(params, index) {
 	};
 	this.getPlayer = (id) => players.find((elem) => elem.idOnField == id); 
 	this.empty = (coords) => {
-		var chunk = map[coords.cx][coords.cy],
-			res = !chunk.bui[coords.dx][coords.dy] && chunk.res[coords.dx][coords.dy] == 0;
+		var res;
+		if (!map[coords.cx])
+			res = true;
+		else if (!map[coords.cx][coords.cy])
+			res = true;
+		else if (!map[coords.cx][coords.cy].arr[coords.dx])
+			res = true;
+		else
+			res = !map[coords.cx][coords.cy].arr[coords.dx][coords.dy];
 		console.log(`empty? ${res}`);
 		return res;
 	};
@@ -279,14 +303,18 @@ function Field(params, index) {
 		return res;
 	};
 	this.place_building = (data) => {
-		if (!bui_to_send[data.cx])
-			bui_to_send[data.cx] = [];
-		if (!bui_to_send[data.cx][data.cy])
-			bui_to_send[data.cx][data.cy] = [];
-		if (!bui_to_send[data.cx][data.cy][data.dx])
-			bui_to_send[data.cx][data.cy][data.dx] = [];
+		if (!map[data.cx])
+			map[data.cx] = [];
+		if (!map[data.cx][data.cy])
+			map[data.cx][data.cy] = {
+				x: data.cx,
+				y: data.cy,
+				arr: []
+			};
+		if (!map[data.cx][data.cy].arr[data.dx])
+			map[data.cx][data.cy].arr[data.dx] = [];
 
-		map[data.cx][data.cy].bui[data.dx][data.dy] = bui_to_send[data.cx][data.cy][data.dx][data.dy] = data.value + "_" + (data.owner % MAX_PLAYERS);
+		map[data.cx][data.cy].arr[data.dx][data.dy] = data.value + "_" + (data.owner % MAX_PLAYERS);
 		
 		var building = building_replica.makeBuilding(data.value, this.getPlayer(data.owner));
 		
@@ -337,8 +365,9 @@ function Field(params, index) {
 		cell.bui.untie();
 		
 		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
-		map[crd.cx][crd.cy].bui[crd.dx][crd.dy] = bui_to_send[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
+		map[crd.cx][crd.cy].arr[crd.dx][crd.dy] = undefined;
 		
+		console.log("building removed");
 		this.emit_chunk(crd.cx, crd.cy);
 	};
 	this.remove_player = (player) => {
@@ -357,18 +386,14 @@ function Field(params, index) {
 				col: 16 
 			}, 
 			i: index, 
-			mapParams: {
-				compressed: params,
-				height: params.height,
-				resourceMap: map,
-				heightMap: heightMap
-			},
-			buildings: bui_to_send
+			mapParams: params,
+			heightMap: heightMap,
+			buildings: map
 		};
 	};
 };
 
-function ResourceSource(type) {
+function ResourceSource(type, field, coords) {
 	this.own = -1;
 	this.type = -type;
 	this.product = {
@@ -377,7 +402,26 @@ function ResourceSource(type) {
 		b: type == 3 ? resData[0].start_res : 0
 	};
 	var outputs = [];
-	this.push_output = (elem) => outputs.push(elem);
-	this.remove_output = (elem) => outputs.splice(outputs.indexOf(elem), 1);
+	var callback;
+	this.push_output = (elem) => {
+		outputs.push(elem);
+		if (callback == undefined)
+			callback = setInterval(this.tryRemove, 1000);
+	}
+	this.remove_output = (elem) => {
+		outputs.splice(outputs.indexOf(elem), 1);
+		if (outputs == []) {
+			clearInterval(callback);
+			callback = undefined;
+		}
+	}
 	this.clients = () => outputs.length;
+	this.untie = () => outputs.forEach((elem) => elem.remove_neighbour(this));
+	this.tryRemove = () => {
+		let p = this.product;
+		if (p.r == 0 && p.g == 0 && p.b == 0) {
+			clearInterval(callback);
+			field.remove_building(coords);
+		}
+	}
 };
