@@ -1,14 +1,15 @@
 const map_gen = require('./client/lib/map_gen').MapGen,
-	  coords = require('./client/lib/coords').CoordsEnvironment,
-	  buildingFactory = require('./lib/build_gen').buildingFactory,
-	  fs = require('fs'),
-	  Papa = require('papaparse'),
-	  sync = require('synchronize');
+      coords = require('./client/lib/coords').CoordsEnvironment,
+      buildingFactory = require('./lib/build_gen').buildingFactory,
+      ResourceSource = require('./lib/build_gen').ResourceSource,
+      fs = require('fs'),
+      Papa = require('papaparse'),
+      sync = require('synchronize');
 
 const express = require('express'),
-	  app = express(),
-	  server = require('http').Server(app),
-	  io = require('socket.io')(server);
+      app = express(),
+      server = require('http').Server(app),
+      io = require('socket.io')(server);
 
 app.get('/', (req, res) => {
 	res.sendFile(__dirname + '/index.html');
@@ -17,9 +18,9 @@ app.use('/client', express.static(__dirname + '/client'));
 
 const table_names = ['map-table', 'player-table', 'buildings-table', 'link-table'];
 var mapData,
-	resData,
-	buiData,
-	linkData;
+    resData,
+    buiData,
+    linkData;
 
 var parses = [];
 table_names.forEach((elem) => parse(elem));
@@ -30,7 +31,7 @@ var countLoads = 0;
 const numberOfParses = 4;
 
 var field_list = [],
-	player_list = [];
+    player_list = [];
 
 io.sockets.on('connection', (socket) => {
 	console.log(`socket ${socket.id} connected`);
@@ -60,8 +61,8 @@ io.sockets.on('connection', (socket) => {
 			console.log('build request: ');
 			console.log(data);
 			if (!(
-				(field.reaches(idOnField, data.build) || player.buildingsCoords.length == 0) && 
-				field.empty(data.build) && 
+				(field.reaches(idOnField, data.build) || player.buildingsCoords.length == 0) &&
+				field.empty(data.build) &&
 				player.tryChangeRes(building_replica.getBuildCost(data.build.value), data.option)
 				)) return;
 			data.build.owner = idOnField;
@@ -102,7 +103,7 @@ function parse(name) {
 		}
 		console.log(`${name} succesfully read`);
 		Papa.parse(data, {
-			header: true, 
+			header: true,
 			dynamicTyping: true,
 			complete: (result) => {
 				if (result.data[0].richness) result.data.forEach((elem) => elem.richness /= 100);
@@ -159,7 +160,7 @@ function Player(player_id, spawn_point) {
 		console.log(data);
 		if (!(option === undefined))
 			console.log(`(${option ? "money" : "resources"})`);
-		
+
 		if (res.tryChange(data, option)) {
 			console.log('transaction succesful');
 			io.to(player_id).emit('resources_updated', this.getRes());
@@ -186,10 +187,10 @@ function Resources() {
 			M -= data.m;
 			return true;
 		}
-		if (R < data.r || data.r == -1 || 
+		if (R < data.r || data.r == -1 ||
 			G < data.g || data.g == -1 ||
 			B < data.b || data.b == -1
-			) 
+			)
 			return false;
 		R -= data.r;
 		G -= data.g;
@@ -222,14 +223,14 @@ const MAX_PLAYERS = 7, msPerTick = 250;
 function Field(params, index) {
 	let tmp = map_gen.buildChunked(params);
 	var filled = false,
-		hasPlace = true,
-		map = [],
-		heightMap = map_gen.chunkedDS(params),
-		bui = [],
-		players = [],
-		CE = new coords(42, params.chunkWidth, params.chunkHeight),
-		n = tmp.length, m = tmp[0].length,
-		lastPlayerId = -1;
+	    hasPlace = true,
+	    map = [],
+	    heightMap = map_gen.chunkedDS(params),
+	    bui = [],
+	    players = [],
+	    CE = new coords(42, params.chunkWidth, params.chunkHeight),
+	    n = tmp.length, m = tmp[0].length,
+	    lastPlayerId = -1;
 	for (let ci = 0; ci < n; ++ci) {
 		bui[ci] = [];
 		for (let cj = 0; cj < m; ++cj) {
@@ -240,12 +241,12 @@ function Field(params, index) {
 					if (tmp[ci][cj].res[i][j]) {
 						bui[ci][cj][i][j] = {
 							bui: new ResourceSource(
-								tmp[ci][cj].res[i][j], 
-								this, 
+								tmp[ci][cj].res[i][j],
+								this,
 								{
-									cx : ci, 
-									cy: cj, 
-									dx: i, 
+									cx : ci,
+									cy: cj,
+									dx: i,
 									dy: j
 								}
 							),
@@ -315,16 +316,16 @@ function Field(params, index) {
 			map[data.cx][data.cy].arr[data.dx] = [];
 
 		map[data.cx][data.cy].arr[data.dx][data.dy] = data.value + "_" + (data.owner % MAX_PLAYERS);
-		
+
 		var building = building_replica.makeBuilding(data.value, this.getPlayer(data.owner));
-		
+
 		var offset = new CE.Offset(data.cx * params.chunkWidth + data.dx, data.cy * params.chunkHeight + data.dy);
 		for (let i = 0; i < 6; ++i) {
 			var neigh = offset.getNeighbor(i),
-				nech = neigh.toChunk(),
-				tdx = neigh.getRow() % params.chunkWidth,
-				tdy = neigh.getCol() % params.chunkHeight,
-				other = bui[nech.getX()][nech.getY()][tdx][tdy];
+			    nech = neigh.toChunk(),
+			    tdx = neigh.getRow() % params.chunkWidth,
+			    tdy = neigh.getCol() % params.chunkHeight,
+			    other = bui[nech.getX()][nech.getY()][tdx][tdy];
 			if (other === undefined || (other.own >= 0 && other.own != data.owner)) continue;
 			//TODO: add resources to link table
 			if (precedes(data.value, other.val)) {
@@ -338,14 +339,14 @@ function Field(params, index) {
 		}
 
 		bui[data.cx][data.cy][data.dx][data.dy] = {
-			bui: building, 
-			own: data.owner, 
-			val: data.value, 
+			bui: building,
+			own: data.owner,
+			val: data.value,
 			clb: setInterval(building.call, building.getTime() * msPerTick)
 		};
 
 		console.log(`succesfully built ${data.value} on ${data.cx} ${data.cy} ${data.dx} ${data.dy}`);
-		
+
 		this.emit_chunk(data.cx, data.cy);
 	};
 	this.owns = (player, coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy] && bui[coords.cx][coords.cy][coords.dx][coords.dy].own == player;
@@ -359,14 +360,14 @@ function Field(params, index) {
 	};
 	this.remove_building = (crd) => {
 		var cell = bui[crd.cx][crd.cy][crd.dx][crd.dy];
-		
+
 		clearInterval(cell.clb);
 
 		cell.bui.untie();
-		
+
 		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
 		map[crd.cx][crd.cy].arr[crd.dx][crd.dy] = undefined;
-		
+
 		console.log("building removed");
 		this.emit_chunk(crd.cx, crd.cy);
 	};
@@ -380,48 +381,15 @@ function Field(params, index) {
 	};
 	this.get_next = () => {
 		//TODO: will be different
-		return { 
-			homeCell: { 
-				row: 16, 
-				col: 16 
-			}, 
-			i: index, 
+		return {
+			homeCell: {
+				row: 16,
+				col: 16
+			},
+			i: index,
 			mapParams: params,
 			heightMap: heightMap,
 			buildings: map
 		};
 	};
-};
-
-function ResourceSource(type, field, coords) {
-	this.own = -1;
-	this.type = -type;
-	this.product = {
-		r: type == 1 ? resData[0].start_res : 0, 
-		g: type == 2 ? resData[0].start_res : 0,
-		b: type == 3 ? resData[0].start_res : 0
-	};
-	var outputs = [];
-	var callback;
-	this.push_output = (elem) => {
-		outputs.push(elem);
-		if (callback == undefined)
-			callback = setInterval(this.tryRemove, 1000);
-	}
-	this.remove_output = (elem) => {
-		outputs.splice(outputs.indexOf(elem), 1);
-		if (outputs == []) {
-			clearInterval(callback);
-			callback = undefined;
-		}
-	}
-	this.clients = () => outputs.length;
-	this.untie = () => outputs.forEach((elem) => elem.remove_neighbour(this));
-	this.tryRemove = () => {
-		let p = this.product;
-		if (p.r == 0 && p.g == 0 && p.b == 0) {
-			clearInterval(callback);
-			field.remove_building(coords);
-		}
-	}
 };
