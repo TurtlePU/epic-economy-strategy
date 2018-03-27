@@ -23,11 +23,16 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	var buildInfo;
 
+	var mapOfChunks, heightMap, maxHeight;
+
 	this.build = (gameData) => {
 		buildInfo = gameData.buiData;
 
-		getBounds(gameData.mapParams.compressed, gameData.homeCell);
-		fillMap(gameData.mapParams, gameData.buildings);
+		getBounds(gameData.mapParams, gameData.homeCell);
+		
+		mapOfChunks = gameData.buildings;
+		heightMap = gameData.heightMap;
+		maxHeight = gameData.mapParams.height;
 
 		fillSpriteArray();
 		content.addChild(stage);
@@ -48,8 +53,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		console.log("GE.build finished");
 	};
 
-	var mapOfChunks = [[]], heightMap;
-	var maxHeight;
 	this.updateChunk = (chunk) => {
 		console.log("chunk updated");
 		mapOfChunks[chunk.x][chunk.y] = chunk;
@@ -196,22 +199,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		};
 	};
 
-	function fillMap(mapParams, buildings) {
-		mapOfChunks = mapParams.resourceMap;
-		heightMap = mapParams.heightMap;
-		maxHeight = mapParams.height;
-		//console.log(buildings);
-		if (buildings.length) {
-			for (let i = 0; i < mapWidthInChunks; ++i) {
-				if (!buildings[i]) continue;
-				for (let j = 0; j < mapHeightInChunks; ++j) {
-					if (!buildings[i][j]) continue;
-					mapOfChunks[i][j].bui = buildings[i][j];
-				}
-			}
-		}
-	};
-
 	this.resize = (window) => (event) => {
 		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
 		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
@@ -235,16 +222,17 @@ function GameEnvironment(PIXI, Papa, EE) {
 		console.log(`resize`);
 	};
 
+	const menu = [];
+
 	this.moveScreenByPoint = (x, y) => {
 		if (initialWidth == undefined)
 			initialWidth = window.innerWidth;
 		var move = new CE.Point(x, y);
 		return () => {
+			menu['0'].hide();
 			focusVelocity = focusVelocity.add(move.mul(window.innerWidth / initialWidth));
 		}
 	};
-
-	const menu = [];
 
 	this.addMouseListener = () => {
 		var data;
@@ -271,16 +259,13 @@ function GameEnvironment(PIXI, Papa, EE) {
 			console.log(tmp);
 
 			menu['0'].hide();
-			
-			if (!mapOfChunks[tmp.cx][tmp.cy].res[tmp.dx][tmp.dy]) {
-				menu['0'].visible = true;
-				if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
-					data = {build: tmp};
-					menu['main_types'].show();
-				} else {
-					data = {coords: tmp};
-					menu['upgrade'].show();
-				}
+			menu['0'].visible = true;
+			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
+				data = {build: tmp};
+				menu['main_types'].show();
+			} else if (!resource(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
+				data = {coords: tmp};
+				menu['upgrade'].show();
 			}
 
 			boundsOnMapInPixels.pushFocus();
@@ -340,11 +325,20 @@ function GameEnvironment(PIXI, Papa, EE) {
 		});
 	};
 
-	function empty(cx, cy, dx, dy) {
-		return mapOfChunks[cx][cy].bui == undefined ||
-			   mapOfChunks[cx][cy].bui[dx] == undefined ||
-			   mapOfChunks[cx][cy].bui[dx][dy] == undefined; 
-	};
+	function empty(cx, cy, dx, dy) { return get(cx, cy, dx, dy) == undefined; };
+
+	function resource(cx, cy, dx, dy) {
+		let str = get(cx, cy, dx, dy);
+		if (str == undefined) return false;
+		return str.split("_")[1] == "-1";
+	}
+
+	function get(cx, cy, dx, dy) {
+		let a = mapOfChunks;
+		if (!(a[cx] && a[cx][cy] && a[cx][cy].arr && a[cx][cy].arr[dx]))
+			return undefined;
+		return a[cx][cy].arr[dx][dy];
+	}
 
 	function tryEmit(data) {
 		if (data.build)
@@ -374,7 +368,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 		chunkContainers[i][j].y = pixelCoord.getY();
 
 		for (let x = 0; x < chunkWidthInCells; ++x) {
-			if (!mapOfChunks[i][j].res[x]) break;
+			if (!heightMap[i][j].res[x]) break;
 			for (let y = 0; y < chunkHeightInCells; ++y) {
 				var cellSprite = getSpriteOfCell(i, j, x, y),
 				    pc = new CE.Offset(x, y).toPoint();
@@ -397,13 +391,16 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	function getPathOfCellImage(i, j, x, y) {
 		if (heightMap[i][j].res[x] === undefined || heightMap[i][j].res[x][y] === undefined) return [];
-		if (!mapOfChunks[i][j].res[x][y]) mapOfChunks[i][j].res[x][y] = 0;
-		if (mapOfChunks[i][j].res[x][y])
-			return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`), img(`res_color${mapOfChunks[i][j].res[x][y]}`)];
-		if (mapOfChunks[i][j].bui && mapOfChunks[i][j].bui[x] && mapOfChunks[i][j].bui[x][y])
-			return [img(`building${mapOfChunks[i][j].bui[x][y]}`)];
+		if (!empty(i, j, x, y))
+			return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`), img(nameOf(mapOfChunks[i][j].arr[x][y]))];
 		return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`)];
 	};
+
+	function nameOf(value) {
+		if (value.split("_")[1] == "-1")
+			return `res_color${-value.split("_")[0]}`;
+		return `building${value}`;
+	}
 
 	function getSpriteOfCell(i, j, x, y) {
 		let res = [];
