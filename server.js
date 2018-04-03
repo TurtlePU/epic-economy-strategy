@@ -1,7 +1,7 @@
 const map_gen = require('./client/lib/map_gen').MapGen,
       coords = require('./client/lib/coords').CoordsEnvironment,
       buildingFactory = require('./lib/build_gen').buildingFactory,
-      ResourceSource = require('./lib/build_gen').ResourceSource,
+      resourceSourceBuilder = require('./lib/build_gen').resourceSourceBuilder,
       fs = require('fs'),
       Papa = require('papaparse'),
       sync = require('synchronize');
@@ -25,7 +25,7 @@ var mapData,
 var parses = [];
 table_names.forEach((elem) => parse(elem));
 
-var building_replica;
+var building_replica, ResourceSource;
 
 var countLoads = 0;
 const numberOfParses = 4;
@@ -42,6 +42,7 @@ io.sockets.on('connection', (socket) => {
 			buiData = parses[table_names[2]];
 			linkData = parses[table_names[3]];
 			building_replica = new buildingFactory(buiData);
+			ResourceSource = resourceSourceBuilder(resData);
 		}
 		var player, field, idOnField;
 		socket.on('new_player', (data) => {

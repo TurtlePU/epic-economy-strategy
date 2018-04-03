@@ -45,7 +45,7 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 					key.isDown = true;
 					key.isUp = false;
 				}
-				event.preventDefault();
+				//event.preventDefault();
 			},
 			upHandler: function(event) {
 				if (event.keyCode === key.code) {
@@ -55,7 +55,7 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 					key.isDown = false;
 					key.isUp = true;
 				}
-				event.preventDefault();
+				//event.preventDefault();
 			}
 		};
 
