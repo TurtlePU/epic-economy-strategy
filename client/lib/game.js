@@ -1,6 +1,5 @@
 function GameEnvironment(PIXI, Papa, EE) {
 	const gl = new PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight),
-	      imagePathList = buildImgPathList(),
 	      GE = this;
 
 	var initialWidth = undefined;
@@ -9,9 +8,14 @@ function GameEnvironment(PIXI, Papa, EE) {
 		sayHello();
 		document.body.appendChild(gl.view);
 		PIXI.loader
-			.add(imagePathList)
-			.on("progress", showProgress)
-			.load(EE.emitPlayer);
+		    .add(buildPathList('png'))
+		    .on("progress", showProgress('png'))
+		    .load(()=>{
+		PIXI.loader
+		    .add(buildPathList('json'))
+		    .on("progress", showProgress('json'))
+		    .load(EE.emitPlayer);
+		});
 	};
 
 	const content = new PIXI.Container(),
@@ -85,33 +89,33 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 	//setInterval(velocityTick, 20);
 
-	function texture(path) {
-		return PIXI.loader.resources[path].texture;
+	function path(atlas, ext) { return `client/img/${atlas}.${ext}`; };
+
+	function sprite(atlas, name) {
+		return new PIXI.Sprite(
+			PIXI.loader
+			.resources[path(atlas, 'json')]
+			.textures[`${name}.png`]
+		); 
 	};
-	function img(name) {
-		return `./client/img/${name}.png`;
-	};
-	function buildImgPathList() {
+
+	function menuSprite(number) { return sprite('menu', `menu_${number}`); };
+	function buildSprite(number) { return sprite('buildings', `building_${number}`); };
+	function cellSprite(number) { return sprite('cell_colors', `cell_color_${number}`); };
+	function playerSprite(number) { return sprite('player_colors', `player_color_${number}`); };
+	function resourceSprite(cell, number) { return sprite('resources', `res_${cell ? 'color' : 'overlay'}_${number}`); };
+
+	const atlases_names = [
+		'buildings',
+		'cell_colors',
+		'menu',
+		'player_colors',
+		'resources'
+	];
+
+	function buildPathList(ext) {
 		var res = [];
-		for (let i = 1; i < 4; ++i)
-			res.push(img(`res_color${i}`));
-		for (let i = 1; i < 11; ++i)
-			res.push(img(`cell_color0${i}`));
-		for (let i = 1; i < 12; ++i)
-			for (let j = 0; j < 7; ++j)
-				res.push(img(`building${i}_${j}`));
-		for (let i = 0; i < 2; ++i)
-			res.push(img(`menu_0_${i}`));
-		for (let i = 0; i < 3; ++i)
-			res.push(img(`menu_4_${i}`));
-		res.push(img(`menu_3_0`));
-		for (let i = 1; i < 3; ++i)
-			for (let j = 0; j < 5; ++j)
-				res.push(img(`menu_${i}_${j}`));
-		res.push(img(`menu_5`));
-		res.push(img(`menu_6`));
-		for (let i = 1; i < 5; ++i)
-			res.push(img(`res_overlay_${i}`));
+		atlases_names.forEach( (e) => res.push(path(e, ext)) );
 		return res;
 	}
 
@@ -130,10 +134,12 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	var progressText;
-	function showProgress(loader, resource) {
-		console.log("loading...");
-		//TODO: Normal progress bar
-	};
+	function showProgress(ext){
+		return (loader, resource) => {
+			console.log(`loading ${ext}. Progress: ${loader.progress}`);
+			//TODO: Normal progress bar
+		};
+	}
 
 	var cellSideSizeInPixels;
 	var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
@@ -148,7 +154,7 @@ function GameEnvironment(PIXI, Papa, EE) {
 	var upperHalf, bottomHalf;
 
 	function getBounds(mapParams, homeCell) {
-		let spr = new PIXI.Sprite(texture(img("cell_color02"))),
+		let spr = cellSprite(1),
 		    w = spr.width, h = spr.height;
 
 		cellSideSizeInPixels = h / 2;
@@ -389,29 +395,23 @@ function GameEnvironment(PIXI, Papa, EE) {
 		}
 	}
 
-	function getPathOfCellImage(i, j, x, y) {
-		if (heightMap[i][j].res[x] === undefined || heightMap[i][j].res[x][y] === undefined) return [];
-		if (!empty(i, j, x, y))
-			return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`), img(nameOf(mapOfChunks[i][j].arr[x][y]))];
-		return [img(`cell_color0${height(heightMap[i][j].res[x][y])}`)];
-	};
-
-	function nameOf(value) {
-		if (value.split("_")[1] == "-1")
-			return `res_color${-value.split("_")[0]}`;
-		return `building${value}`;
-	}
-
 	function getSpriteOfCell(i, j, x, y) {
-		let res = [];
-		let t = getPathOfCellImage(i, j, x, y);
-		t.forEach((elem) => res.push(new PIXI.Sprite(texture(elem))));
-		return res;
-	};
+		if (
+			heightMap[i][j].res[x] === undefined 
+			|| heightMap[i][j].res[x][y] === undefined
+			) return [];
 
-	function sprite(name) {
-		return new PIXI.Sprite(texture(img(name)));
-	}
+		var heightCell = cellSprite(height(heightMap[i][j].res[x][y]));
+
+		if (empty(i, j, x, y)) return [heightCell];
+		
+		var split = mapOfChunks[i][j].arr[x][y].split("_");
+
+		if (split[1] == '-1' && Number(split[0]) < 0)
+			return [heightCell, resourceSprite(true, -Number(split[0]))];
+		else
+			return [heightCell, playerSprite(split[1]), buildSprite(split[0])];
+	};
 
 	var resourceRect;
 
@@ -446,13 +446,13 @@ function GameEnvironment(PIXI, Papa, EE) {
 		menu['option'].position = new PIXI.Point(upLeft.getX(), upLeft.getY());
 
 		menu['option'].addChild(
-			menu['option0'] = sprite('menu_0_0'),
-			menu['option1'] = sprite('menu_0_1')
+			menu['option0'] = menuSprite('0_0'),
+			menu['option1'] = menuSprite('0_1')
 		);
 
 		menu['upgrade'].addChild(
-			menu['upgrade_0'] = sprite('menu_5'),
-			menu['remove'] = sprite('menu_6')
+			menu['upgrade_0'] = menuSprite(5),
+			menu['remove'] = menuSprite(6)
 		);
 		menu['upgrade'].hide = () => {
 			menu['upgrade'].visible = false;
@@ -465,10 +465,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 		};
 
 		menu['main_types'].addChild(
-			menu['mine'] = sprite('menu_1_0'),
-			menu['prod'] = sprite('menu_2_0'),
-			menu['sell'] = sprite('menu_3_0'),
-			menu['store'] = sprite('menu_4_0')
+			menu['mine'] = menuSprite('1_0'),
+			menu['prod'] = menuSprite('2_0'),
+			menu['sell'] = menuSprite(3),
+			menu['store'] = menuSprite('4_0')
 		);
 		menu['main_types'].hide = () => {
 			menu['main_types'].visible = false;
@@ -505,10 +505,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 		menu['store_types'].y = menu['store_types'].y + (menu['store'].y = shift_neighbours[0].getY());
 
 		menu['mine_types'].addChild(
-			menu['mine_r'] = sprite('menu_1_1'),
-			menu['mine_g'] = sprite('menu_1_2'),
-			menu['mine_b'] = sprite('menu_1_3'),
-			menu['mine_u'] = sprite('menu_1_4')
+			menu['mine_r'] = menuSprite('1_1'),
+			menu['mine_g'] = menuSprite('1_2'),
+			menu['mine_b'] = menuSprite('1_3'),
+			menu['mine_u'] = menuSprite('1_4')
 		);
 
 		menu['mine_r'].x = neighbours[5].getX();
@@ -521,10 +521,10 @@ function GameEnvironment(PIXI, Papa, EE) {
 		menu['mine_b'].y = neighbours[1].getY();
 
 		menu['prod_types'].addChild(
-			menu['prod_r'] = sprite('menu_2_1'),
-			menu['prod_g'] = sprite('menu_2_2'),
-			menu['prod_b'] = sprite('menu_2_3'),
-			menu['prod_u'] = sprite('menu_2_4')
+			menu['prod_r'] = menuSprite('2_1'),
+			menu['prod_g'] = menuSprite('2_2'),
+			menu['prod_b'] = menuSprite('2_3'),
+			menu['prod_u'] = menuSprite('2_4')
 		);
 
 		menu['prod_r'].x = neighbours[4].getX();
@@ -537,17 +537,17 @@ function GameEnvironment(PIXI, Papa, EE) {
 		menu['prod_b'].y = neighbours[0].getY();
 
 		menu['store_types'].addChild(
-			menu['store_0'] = sprite('menu_4_2'),
-			menu['store_1'] = sprite('menu_4_1')
+			menu['store_0'] = menuSprite('4_2'),
+			menu['store_1'] = menuSprite('4_1')
 		);
 
 		menu['0'].hide();
 
 		//overlay.addChild(resText);
-		let R_pict = new PIXI.Sprite(texture(img("res_overlay_1"))),
-		    G_pict = new PIXI.Sprite(texture(img("res_overlay_2"))),
-		    B_pict = new PIXI.Sprite(texture(img("res_overlay_3"))),
-		    M_pict = new PIXI.Sprite(texture(img("res_overlay_4")));
+		let R_pict = resourceSprite(false, 1),
+		    G_pict = resourceSprite(false, 2),
+		    B_pict = resourceSprite(false, 3),
+		    M_pict = resourceSprite(false, 4);
 
 		let h = R_pict.height, pad = 0;
 
