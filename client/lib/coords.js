@@ -3,6 +3,8 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
     const sqrt3 = Math.sqrt(3);
     const CE = this;
 
+    this.getHexHeight = function() { return hexSize * 2; }
+
     this.Offset = function(row, col) {
         this.getRow = function() {return row;};
         this.getCol = function() {return col;};
