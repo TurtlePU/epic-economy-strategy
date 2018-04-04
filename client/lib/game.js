@@ -8,14 +8,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 		sayHello();
 		document.body.appendChild(gl.view);
 		PIXI.loader
-		    .add(buildPathList('png'))
-		    .on("progress", showProgress('png'))
-		    .load(()=>{
-		PIXI.loader
 		    .add(buildPathList('json'))
 		    .on("progress", showProgress('json'))
 		    .load(EE.emitPlayer);
-		});
 	};
 
 	const content = new PIXI.Container(),
@@ -229,16 +224,76 @@ function GameEnvironment(PIXI, Papa, EE) {
 	};
 
 	const menu = [];
+	const trainText = new PIXI.Container();
 
 	this.moveScreenByPoint = (x, y) => {
 		if (initialWidth == undefined)
 			initialWidth = window.innerWidth;
 		var move = new CE.Point(x, y);
 		return () => {
+			infoText.hide(infoText.lastType);
+			trainText.hide();
 			menu['0'].hide();
 			focusVelocity = focusVelocity.add(move.mul(window.innerWidth / initialWidth));
 		}
 	};
+
+	this.showTrainText = () => {
+		trainText.show();
+		gl.render(content);
+	};
+
+	function getInformationText(name) {
+		if (name == 'mine')
+			return 'I-type digs resources';
+		if (name == 'prod')
+			return 'II-type takes ore from I';
+		if (name == 'store')
+			return 'Cargo sends to you product of II';
+		if (name == 'upgrade_0')
+			return 'Upgrade building';
+	}
+
+	const infoText = new PIXI.Container(), infoTextsList = [];
+	infoText.show = (mode) => {
+		infoText.concrete_bg.visible = infoText.concrete.visible = mode;
+		infoText.abstract_bg.visible = infoText.abstract.visible = !mode;
+		infoText.visible = true;
+	}
+	infoText.lastType = '';
+	infoText.push = (name) => {
+		infoText.lastType = name;
+		var check = buildInfo.some((elem) => {
+			if (elem.func != name)
+				return false;
+			
+			infoTextsList['in'].text = `inputs ${elem.in} packs per process, ${elem.in_u} after each upgrade`;
+			infoTextsList['time'].text = `takes ${elem.time} ticks to process, ${elem.time_u} after each upgrade`;
+			infoTextsList['out'].text = `outputs ${elem.out} ${name == 'sell' ? '$' : 'packs'} per process, ${elem.out_u} after each upgrade`;
+
+			let r = elem.cost_r == -1 ? '?' : elem.cost_r,
+			    g = elem.cost_g == -1 ? '?' : elem.cost_g,
+			    b = elem.cost_b == -1 ? '?' : elem.cost_b,
+			    m = elem.cost_gold == -1 ? '?' : elem.cost_gold;
+			
+			infoTextsList['cost'].text = `${r}r + ${g}g + ${b}b or ${m}$, ${elem.cost_u} for each upgrade`;
+			infoText.show(1);
+
+			return true;
+		});
+		if (!check) {
+			infoTextsList['info'].text = getInformationText(name);
+			infoText.show(0);
+		}
+	}
+	infoText.hide = (name) => {
+		if (infoText.lastType != name) return;
+		infoText.visible = false;
+		infoText.concrete_bg.visible = false;
+		infoText.concrete.visible = false;
+		infoText.abstract_bg.visible = false;
+		infoText.abstract.visible = false;
+	}
 
 	this.addMouseListener = () => {
 		var data;
@@ -246,6 +301,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 		stage.interactive = true;
 		stage.on('mousedown', (event) => {
 			if (state < 2) return;
+
+			trainText.hide();
 
 			var relativePoint = event.data.getLocalPosition(stage);
 			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
@@ -292,6 +349,14 @@ function GameEnvironment(PIXI, Papa, EE) {
 					menu[elem.next].visible = true;
 					if (data.build)
 						data.build.value = elem.value;
+					gl.render(content);
+				});
+				menu[elem.name].on('mouseover', (event) => {
+					infoText.push(elem.name);
+					gl.render(content);
+				});
+				menu[elem.name].on('mouseout', (event) => {
+					infoText.hide(elem.name);
 					gl.render(content);
 				});
 			},
@@ -571,11 +636,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 		GE.updateResources(resources);
 
 		let w = new PIXI.Text("9999m", Font).width;
-		let width = (w + h + pad * 2) * 4 + pad, height = h + 2 * pad, shift = (window.innerWidth - width) / 2;
+		let width = (w + h + pad * 2) * 4 + pad, height = h + 2 * pad;
 		let margin = 0;
-
-		//R_pict.x = G_pict.x = B_pict.x = M_pict.x = pad;
-		//R_text.x = G_text.x = B_text.x = M_text.x = h + 2 * pad;
 
 		R_pict.x = pad + margin;
 		R_text.x = R_pict.x + h + pad;
@@ -590,11 +652,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		M_text.x = M_pict.x + h + pad;
 
 		let delta = (h - R_text.height) / 2;
-
-		//R_text.y = (R_pict.y = pad) + delta;
-		//G_text.y = (G_pict.y = h + 2 * pad) + delta;
-		//B_text.y = (B_pict.y = 2 * h + 3 * pad) + delta;
-		//M_text.y = (M_pict.y = 3 * h + 4 * pad) + delta;
 
 		R_text.y = G_text.y = B_text.y = M_text.y = (R_pict.y = G_pict.y = B_pict.y = M_pict.y = pad + margin) + delta;
 
@@ -621,13 +678,109 @@ function GameEnvironment(PIXI, Papa, EE) {
 
 		overlay.addChild(resourceRect);
 
+		var newFont = { font : `${h / 2}px Arial`, fill : 0x00FF00 };
+
+		infoText.concrete = new PIXI.Container();
+		infoText.concrete.addChild(
+			infoTextsList['in'] = new PIXI.Text('', newFont),
+			infoTextsList['time'] = new PIXI.Text('', newFont),
+			infoTextsList['out'] = new PIXI.Text('', newFont),
+			infoTextsList['cost'] = new PIXI.Text('', newFont)
+		);
+
+		infoText.abstract = new PIXI.Container();
+		infoText.abstract.addChild(
+			infoTextsList['info'] = new PIXI.Text('', newFont)
+		);
+
+		infoTextsList['in'].x = infoTextsList['info'].x =
+		infoTextsList['time'].x =
+		infoTextsList['out'].x =
+		infoTextsList['cost'].x =
+		pad = h / 5;
+
+		infoTextsList['in'].y = infoTextsList['info'].y = pad;
+		infoTextsList['time'].y = infoTextsList['in'].y + h / 2 + pad;
+		infoTextsList['out'].y = infoTextsList['time'].y + h / 2 + pad;
+		infoTextsList['cost'].y = infoTextsList['out'].y + h / 2 + pad;
+
+		infoText.mywidth = width = new PIXI.Text(
+			`9999r + 9999g + 9999b or 9999$, multiply 2 for each upgrade`,
+			newFont).width + 2 * pad;
+		height = (h / 2 + pad) * 4 + pad, height_1 = h / 2 + 2 * pad;
+
+		infoText.concrete_bg = new PIXI.Graphics();
+
+		infoText.concrete_bg.beginFill(0x000000, 0.5);
+		infoText.concrete_bg.lineStyle(margin * 2, 0x00FF00, 1);
+
+		infoText.concrete_bg.moveTo(0 + margin, 0 + margin);
+		infoText.concrete_bg.lineTo(width + margin, 0 + margin);
+		infoText.concrete_bg.lineTo(width + margin, height + margin);
+		infoText.concrete_bg.lineTo(0 + margin, height + margin);
+		infoText.concrete_bg.lineTo(0 + margin, 0 + margin);
+		infoText.concrete_bg.endFill();
+
+		infoText.abstract_bg = new PIXI.Graphics();
+
+		infoText.abstract_bg.beginFill(0x000000, 0.5);
+		infoText.abstract_bg.lineStyle(margin * 2, 0x00FF00, 1);
+
+		infoText.abstract_bg.moveTo(0 + margin, 0 + margin);
+		infoText.abstract_bg.lineTo(width + margin, 0 + margin);
+		infoText.abstract_bg.lineTo(width + margin, height_1 + margin);
+		infoText.abstract_bg.lineTo(0 + margin, height_1 + margin);
+		infoText.abstract_bg.lineTo(0 + margin, 0 + margin);
+		infoText.abstract_bg.endFill();
+
+		infoText.addChild(
+			infoText.concrete_bg, infoText.concrete,
+			infoText.abstract_bg, infoText.abstract
+		);
+		infoText.visible = false;
+
+		overlay.addChild(infoText);
+
+		var txt = new PIXI.Text('WASD to move\nLMB to select cell\nT to show this message', newFont);
+		graphics = new PIXI.Graphics();
+
+		graphics.beginFill(0x000000, 0.5);
+		graphics.lineStyle(margin * 2, 0x00FF00, 1);
+
+		graphics.moveTo(0 + margin - pad, 0 + margin - pad);
+		graphics.lineTo(txt.width + margin + pad, 0 + margin - pad);
+		graphics.lineTo(txt.width + margin + pad, txt.height + margin + pad);
+		graphics.lineTo(0 + margin - pad, txt.height + margin + pad);
+		graphics.lineTo(0 + margin - pad, 0 + margin - pad);
+		graphics.endFill();
+
+		trainText.addChild(graphics, txt);
+		trainText.mywidth = txt.width;
+		trainText.myheigh = txt.height;
+
+		trainText.show = () => trainText.visible = true;
+		trainText.hide = () => trainText.visible = false;
+
+		overlay.addChild(trainText);
+
 		updateOverlayCoords(1);
 	};
 
 	function updateOverlayCoords(scale) {
-		resourceRect.x = (menu['0'].x = d.getX()) - resourceRect.mywidth * scale / 2;
+		menu['0'].x = d.getX()
 		menu['0'].y = d.getY();
-		resourceRect.scale.x = menu['0'].scale.x = resourceRect.scale.y = menu['0'].scale.y = scale;
+		menu['0'].scale.x = menu['0'].scale.y = scale;
+		
+		resourceRect.x = d.getX() - resourceRect.mywidth * scale / 2;
+		resourceRect.scale.x = resourceRect.scale.y = scale;
+
+		infoText.x = d.getX() - infoText.mywidth * scale / 2;
+		infoText.y = d.getY() + CE_overlay.getHexHeight() * scale;
+		infoText.scale.x = infoText.scale.y = scale;
+
+		trainText.x = d.getX() - trainText.mywidth * scale / 2;
+		trainText.y = d.getY() - trainText.myheigh * scale / 2;
+		trainText.scale.x = trainText.scale.y = scale;
 	};
 
 	var lastTime;
@@ -635,7 +788,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		var dt = time - lastTime;
 		lastTime = time;
 		if (state == 2 && !focusVelocity.equals(zeroPoint)) {
-			console.log(`render for ${dt}ms`);
 			focus = focus.add(focusVelocity.mul(dt));
 			boundsOnMapInPixels.pushFocus();
 			updRenderingBounds(focusVelocity.mul(dt));
