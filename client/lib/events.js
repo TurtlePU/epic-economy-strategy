@@ -72,13 +72,15 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	const keyLeft = keyboard(65), 
 	      keyRight = keyboard(68), 
 	      keyUp = keyboard(87), 
-	      keyDown = keyboard(83);
+	      keyDown = keyboard(83),
+	      keyTrain = keyboard(84);
 
 	function addKeyboardMovement() {
 		var step = 1;
 		keyLeft.press = keyRight.release = GE.moveScreenByPoint(-step, 0);
 		keyRight.press = keyLeft.release = GE.moveScreenByPoint(step, 0);
 		keyUp.press = keyDown.release = GE.moveScreenByPoint(0, -step);
-		keyDown.press = keyUp.release = GE.moveScreenByPoint(0, step);	
+		keyDown.press = keyUp.release = GE.moveScreenByPoint(0, step);
+		keyTrain.press = GE.showTrainText;
 	}
 }
