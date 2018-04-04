@@ -226,6 +226,8 @@ function Field(params, index) {
 	var filled = false,
 	    hasPlace = true,
 	    map = [],
+	    resources = 0,
+	    maxResources = 0,
 	    heightMap = map_gen.chunkedDS(params),
 	    bui = [],
 	    players = [],
@@ -255,6 +257,8 @@ function Field(params, index) {
 							own: -1,
 							clb: undefined
 						};
+						++resources;
+						++maxResources;
 						if (!map[ci])
 							map[ci] = [];
 						if (!map[ci][cj])
@@ -270,7 +274,7 @@ function Field(params, index) {
 			}
 		}
 	}
-	this.canTake = () => !filled && hasPlace;
+	this.canTake = () => !filled && hasPlace && resources > 0.5 * maxResources;
 	this.getIndex = () => index;
 	this.emit_chunk = (x, y) => {
 		players.forEach((elem) => io.to(elem.getId()).emit('chunkUpdated', map[x][y]));
@@ -372,6 +376,10 @@ function Field(params, index) {
 		console.log("building removed");
 		this.emit_chunk(crd.cx, crd.cy);
 	};
+	this.dec_resources = () => {
+		--resources;
+		console.log(`resource emptied. ${resources}/${maxResources} left`);
+	}
 	this.remove_player = (player) => {
 		player.clearBuildings(this);
 		players.splice(players.indexOf(player), 1);
