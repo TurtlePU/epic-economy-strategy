@@ -48,7 +48,7 @@
 			"spriteSourceSize" : { "x": 0, "y": 0, "w": 70, "h": 80},
 			"sourceSize" : {"w": 70, "h": 80}
 		},
-		"player_color_7.png" : {
+		"player_color_0.png" : {
 			"frame" : { "x": 420, "y": 0, "w": 70, "h": 80 },
 			"rotated": false,
 			"trimmed": false,
