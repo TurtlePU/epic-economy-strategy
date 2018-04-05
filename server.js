@@ -1,10 +1,6 @@
-const map_gen = require('./client/lib/map_gen').MapGen,
-      coords = require('./client/lib/coords').CoordsEnvironment,
-      buildingFactory = require('./lib/build_gen').buildingFactory,
-      resourceSourceBuilder = require('./lib/build_gen').resourceSourceBuilder,
+const build_gen = require('./lib/build_gen'),
       fs = require('fs'),
-      Papa = require('papaparse'),
-      sync = require('synchronize');
+      Papa = require('papaparse');
 
 const express = require('express'),
       app = express(),
@@ -17,18 +13,15 @@ app.get('/', (req, res) => {
 app.use('/client', express.static(__dirname + '/client'));
 
 const table_names = ['map-table', 'player-table', 'buildings-table', 'link-table'];
-var mapData,
-    resData,
-    buiData,
-    linkData;
+var mapData, buiData;
 
 var parses = [];
 table_names.forEach((elem) => parse(elem));
 
-var building_replica, ResourceSource;
-
 var countLoads = 0;
 const numberOfParses = 4;
+
+var Field, Player;
 
 var field_list = [],
     player_list = [];
@@ -36,13 +29,18 @@ var field_list = [],
 io.sockets.on('connection', (socket) => {
 	console.log(`socket ${socket.id} connected`);
 	if (countLoads == numberOfParses) {
-		if (!building_replica) {
+		if (!Field) {
 			mapData = parses[table_names[0]];
-			resData = parses[table_names[1]];
 			buiData = parses[table_names[2]];
-			linkData = parses[table_names[3]];
-			building_replica = new buildingFactory(buiData);
-			ResourceSource = resourceSourceBuilder(resData);
+			Player = require('./lib/player')(parses[table_names[1]], io);
+			Field = require('./lib/field')(
+				new build_gen.buildingFactory(parses[table_names[2]]), 
+				build_gen.resourceSourceBuilder(parses[table_names[1]]), 
+				parses[table_names[3]],
+				require('./lib/map_gen'),
+				require('./client/lib/coords'),
+				io
+			);
 		}
 		var player, field, idOnField;
 		socket.on('new_player', (data) => {
@@ -64,7 +62,7 @@ io.sockets.on('connection', (socket) => {
 			if (!(
 				(field.reaches(idOnField, data.build) || player.buildingsCoords.length == 0) &&
 				field.empty(data.build) &&
-				player.tryChangeRes(building_replica.getBuildCost(data.build.value), data.option)
+				player.tryChangeRes(field.getBuildCost(data.build.value), data.option)
 				)) return;
 			data.build.owner = idOnField;
 			field.place_building(data.build);
@@ -126,82 +124,6 @@ function next_player() {
 	return result.get_next();
 };
 
-//player_id stores socket.ids
-function Player(player_id, spawn_point) {
-	var res = new Resources();
-	var buildingsCoords = [];
-	this.addBuilding = (coords) => {
-		buildingsCoords.push(coords);
-	};
-	this.removeBuilding = (coords) => {
-		var index = 0;
-		buildingsCoords.some((elem, i, arr) => {
-			if (elem.cx == coords.cx && elem.cy == coords.cy && elem.dx == coords.dx && elem.dy == coords.dy) {
-				index = i;
-				return true;
-			}
-		});
-		buildingsCoords.splice(index, 1);
-	};
-	this.clearBuildings = (field) => {
-		buildingsCoords.forEach((elem) => {
-			field.remove_building(elem);
-		});
-	};
-	this.getId = () => player_id;
-	this.getSpawn = () => spawn_point;
-	this.getRes = () => {
-		var ret = res.toJSON();
-		console.log('getRes:');
-		console.log(ret);
-		return ret;
-	};
-	this.tryChangeRes = (data, option) => {
-		console.log(`trying to ${option === undefined ? "earn" : "pay"}: `);
-		console.log(data);
-		if (!(option === undefined))
-			console.log(`(${option ? "money" : "resources"})`);
-
-		if (res.tryChange(data, option)) {
-			console.log('transaction succesful');
-			io.to(player_id).emit('resources_updated', this.getRes());
-			return true;
-		} else {
-			console.log('transaction failed');
-			return false;
-		}
-	};
-};
-
-function Resources() {
-	var R = resData[0].start_r, G = resData[0].start_g, B = resData[0].start_b, M = resData[0].start_m;
-	this.tryChange = (data, option) => {
-		if (option === undefined) {
-			R += data.r ? data.r : 0;
-			G += data.g ? data.g : 0;
-			B += data.b ? data.b : 0;
-			M += data.m ? data.m : 0;
-			return true;
-		}
-		if (option) {
-			if (M < data.m || data.m == -1) return false;
-			M -= data.m;
-			return true;
-		}
-		if (R < data.r || data.r == -1 ||
-			G < data.g || data.g == -1 ||
-			B < data.b || data.b == -1
-			)
-			return false;
-		R -= data.r;
-		G -= data.g;
-		B -= data.b;
-		return true;
-	};
-	this.toJSON = () => {return {r: R, g: G, b: B, m: M};}
-	this.sum = () => R + G + B;
-}
-
 var counter = 0;
 function next_map() {
 	if (counter == mapData.length)
@@ -213,192 +135,4 @@ function next_map() {
 	}
 	console.log(mapData[counter]);
 	return mapData[counter++];
-};
-
-function precedes(fat, son) {
-	return linkData.some((elem) => elem.f == fat && elem.t == son);
-};
-
-const MAX_PLAYERS = 7, msPerTick = 250;
-
-function Field(params, index) {
-	let tmp = map_gen.buildChunked(params);
-	var filled = false,
-	    hasPlace = true,
-	    map = [],
-	    resources = 0,
-	    maxResources = 0,
-	    heightMap = map_gen.chunkedDS(params),
-	    bui = [],
-	    players = [],
-	    CE = new coords(42, params.chunkWidth, params.chunkHeight),
-	    n = tmp.length, m = tmp[0].length,
-	    lastPlayerId = -1;
-	for (let ci = 0; ci < n; ++ci) {
-		bui[ci] = [];
-		for (let cj = 0; cj < m; ++cj) {
-			bui[ci][cj] = [];
-			for (let i = 0; i < params.chunkWidth && tmp[ci][cj].res[i]; ++i) {
-				bui[ci][cj][i] = [];
-				for (let j = 0; j < params.chunkHeight; ++j) {
-					if (tmp[ci][cj].res[i][j]) {
-						bui[ci][cj][i][j] = {
-							bui: new ResourceSource(
-								tmp[ci][cj].res[i][j],
-								this,
-								{
-									cx : ci,
-									cy: cj,
-									dx: i,
-									dy: j
-								}
-							),
-							val: -tmp[ci][cj].res[i][j],
-							own: -1,
-							clb: undefined
-						};
-						++resources;
-						++maxResources;
-						if (!map[ci])
-							map[ci] = [];
-						if (!map[ci][cj])
-							map[ci][cj] = {
-								x: ci, y: cj,
-								arr: []
-							};
-						if (!map[ci][cj].arr[i])
-							map[ci][cj].arr[i] = [];
-						map[ci][cj].arr[i][j] = `${-tmp[ci][cj].res[i][j]}_-1`;
-					}
-				}
-			}
-		}
-	}
-	this.canTake = () => !filled && hasPlace && resources > 0.5 * maxResources;
-	this.getIndex = () => index;
-	this.emit_chunk = (x, y) => {
-		players.forEach((elem) => io.to(elem.getId()).emit('chunkUpdated', map[x][y]));
-	};
-	this.push_player = (player) => {
-		player.idOnField = ++lastPlayerId;
-		players.push(player);
-		if (players.length >= MAX_PLAYERS) {
-			console.log(`map ${index} filled`);
-			filled = true;
-		}
-		return lastPlayerId;
-	};
-	this.getPlayer = (id) => players.find((elem) => elem.idOnField == id); 
-	this.empty = (coords) => {
-		var res;
-		if (!map[coords.cx])
-			res = true;
-		else if (!map[coords.cx][coords.cy])
-			res = true;
-		else if (!map[coords.cx][coords.cy].arr[coords.dx])
-			res = true;
-		else
-			res = !map[coords.cx][coords.cy].arr[coords.dx][coords.dy];
-		console.log(`empty? ${res}`);
-		return res;
-	};
-	this.reaches = (player, coords) => {
-		//TODO: will be different
-		var res = true;
-		console.log(`reaches? ${res}`);
-		return res;
-	};
-	this.place_building = (data) => {
-		if (!map[data.cx])
-			map[data.cx] = [];
-		if (!map[data.cx][data.cy])
-			map[data.cx][data.cy] = {
-				x: data.cx,
-				y: data.cy,
-				arr: []
-			};
-		if (!map[data.cx][data.cy].arr[data.dx])
-			map[data.cx][data.cy].arr[data.dx] = [];
-
-		map[data.cx][data.cy].arr[data.dx][data.dy] = data.value + "_" + (data.owner % MAX_PLAYERS);
-
-		var building = building_replica.makeBuilding(data.value, this.getPlayer(data.owner));
-
-		var offset = new CE.Offset(data.cx * params.chunkWidth + data.dx, data.cy * params.chunkHeight + data.dy);
-		for (let i = 0; i < 6; ++i) {
-			var neigh = offset.getNeighbor(i),
-			    nech = neigh.toChunk(),
-			    tdx = neigh.getRow() % params.chunkWidth,
-			    tdy = neigh.getCol() % params.chunkHeight,
-			    other = bui[nech.getX()][nech.getY()][tdx][tdy];
-			if (other === undefined || (other.own >= 0 && other.own != data.owner)) continue;
-			//TODO: add resources to link table
-			if (precedes(data.value, other.val)) {
-				building.push_output(other.bui);
-				other.bui.push_neighbour(building);
-			}
-			if (precedes(other.val, data.value)) {
-				building.push_neighbour(other.bui);
-				other.bui.push_output(building);
-			}
-		}
-
-		bui[data.cx][data.cy][data.dx][data.dy] = {
-			bui: building,
-			own: data.owner,
-			val: data.value,
-			clb: setInterval(building.call, building.getTime() * msPerTick)
-		};
-
-		console.log(`succesfully built ${data.value} on ${data.cx} ${data.cy} ${data.dx} ${data.dy}`);
-
-		this.emit_chunk(data.cx, data.cy);
-	};
-	this.owns = (player, coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy] && bui[coords.cx][coords.cy][coords.dx][coords.dy].own == player;
-	this.getValue = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].val;
-	this.getUpgradeCost = (coords) => bui[coords.cx][coords.cy][coords.dx][coords.dy].bui.getUpgradeCost();
-	this.upgrade = (coords) => {
-		var cell = bui[coords.cx][coords.cy][coords.dx][coords.dy];
-		clearInterval(cell.clb);
-		cell.bui.upgrade();
-		cell.clb = setInterval(cell.bui.call, cell.bui.getTime() * msPerTick);
-	};
-	this.remove_building = (crd) => {
-		var cell = bui[crd.cx][crd.cy][crd.dx][crd.dy];
-
-		clearInterval(cell.clb);
-
-		cell.bui.untie();
-
-		bui[crd.cx][crd.cy][crd.dx][crd.dy] = undefined;
-		map[crd.cx][crd.cy].arr[crd.dx][crd.dy] = undefined;
-
-		console.log("building removed");
-		this.emit_chunk(crd.cx, crd.cy);
-	};
-	this.dec_resources = () => {
-		--resources;
-		console.log(`resource emptied. ${resources}/${maxResources} left`);
-	}
-	this.remove_player = (player) => {
-		player.clearBuildings(this);
-		players.splice(players.indexOf(player), 1);
-		if (players.length < MAX_PLAYERS) {
-			console.log(`map ${index} can take in more players`);
-			filled = false;
-		}
-	};
-	this.get_next = () => {
-		//TODO: will be different
-		return {
-			homeCell: {
-				row: 16,
-				col: 16
-			},
-			i: index,
-			mapParams: params,
-			heightMap: heightMap,
-			buildings: map
-		};
-	};
 };
