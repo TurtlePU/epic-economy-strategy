@@ -1,8 +1,8 @@
-function EventsEnvironment(window, socket, PIXI, Papa) {
+function EventsEnvironment(socket) {
 	const EE = this,
-	      GE = new GameEnvironment(PIXI, Papa, EE);
+	      GE = new GameEnvironment(EE);
 	
-	this.start = () => { GE.start(); };
+	this.start = () => GE.start();
 
 	socket.on('connect', function() {
 		console.log("connect");
@@ -18,8 +18,7 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	socket.on('gameDataSend', function(gameData) {
 		console.log("game data send");
 		GE.build(gameData);
-		//addResizeListener();
-		addKeyboardMovement();
+		addKeyboard();
 		GE.addMouseListener();
 	});
 
@@ -30,52 +29,13 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 	socket.on('chunkUpdated', GE.updateChunk);
 	socket.on('resources_updated', GE.updateResources);
 
-	function keyboard(keyCode) {
-		var key = {
-			code: keyCode,
-			isDown: false,
-			isUp: true,
-			press: function() {},
-			release: function() {},
-			downHandler: function(event) {
-				if (event.keyCode === key.code) {
-					if (key.isUp && key.press) {
-						key.press();
-					}
-					key.isDown = true;
-					key.isUp = false;
-				}
-				//event.preventDefault();
-			},
-			upHandler: function(event) {
-				if (event.keyCode === key.code) {
-					if (key.isDown && key.release) {
-						key.release();
-					}
-					key.isDown = false;
-					key.isUp = true;
-				}
-				//event.preventDefault();
-			}
-		};
-
-		window.addEventListener("keydown", key.downHandler.bind(key), false);
-		window.addEventListener("keyup", key.upHandler.bind(key), false);
-
-		return key;
-	}
-
-	function addResizeListener() {
-		window.addEventListener("resize", GE.resize(window), false);
-	}
-
 	const keyLeft = keyboard(65), 
 	      keyRight = keyboard(68), 
 	      keyUp = keyboard(87), 
 	      keyDown = keyboard(83),
 	      keyTrain = keyboard(84);
 
-	function addKeyboardMovement() {
+	function addKeyboard() {
 		var step = 1;
 		keyLeft.press = keyRight.release = GE.moveScreenByPoint(-step, 0);
 		keyRight.press = keyLeft.release = GE.moveScreenByPoint(step, 0);
@@ -83,4 +43,39 @@ function EventsEnvironment(window, socket, PIXI, Papa) {
 		keyDown.press = keyUp.release = GE.moveScreenByPoint(0, step);
 		keyTrain.press = GE.showTrainText;
 	}
+}
+
+function keyboard(keyCode) {
+	var key = {
+		code: keyCode,
+		isDown: false,
+		isUp: true,
+		press: function() {},
+		release: function() {},
+		downHandler: function(event) {
+			if (event.keyCode === key.code) {
+				if (key.isUp && key.press) {
+					key.press();
+				}
+				key.isDown = true;
+				key.isUp = false;
+			}
+			//event.preventDefault();
+		},
+		upHandler: function(event) {
+			if (event.keyCode === key.code) {
+				if (key.isDown && key.release) {
+					key.release();
+				}
+				key.isDown = false;
+				key.isUp = true;
+			}
+			//event.preventDefault();
+		}
+	};
+
+	window.addEventListener("keydown", key.downHandler.bind(key), false);
+	window.addEventListener("keyup", key.upHandler.bind(key), false);
+
+	return key;
 }
