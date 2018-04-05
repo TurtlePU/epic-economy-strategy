@@ -1,2 +1,2 @@
-const EE = new EventsEnvironment(window, io.connect(), PIXI, Papa);
+const EE = new EventsEnvironment(io.connect());
 EE.start();
