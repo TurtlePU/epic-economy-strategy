@@ -1,8 +1,8 @@
-function GameEnvironment(PIXI, Papa, EE) {
+function GameEnvironment(EE) {
 	const gl = new PIXI.autoDetectRenderer(window.innerWidth, window.innerHeight),
 	      GE = this;
 
-	var initialWidth = undefined;
+	//Section 1: Initializing processes
 
 	this.start = () => {
 		sayHello();
@@ -13,92 +13,19 @@ function GameEnvironment(PIXI, Papa, EE) {
 		    .load(EE.emitPlayer);
 	};
 
-	const content = new PIXI.Container(),
-	      stage = new PIXI.Container(),
-	      overlay = new PIXI.Container();
-
-	var zeroPoint;
-	var state = 0;
-
-	var buildInfo;
-
-	var mapOfChunks, heightMap, maxHeight;
-
-	this.build = (gameData) => {
-		buildInfo = gameData.buiData;
-
-		getBounds(gameData.mapParams, gameData.homeCell);
-
-		mapOfChunks = gameData.buildings;
-		heightMap = gameData.heightMap;
-		maxHeight = gameData.mapParams.height;
-
-		fillSpriteArray();
-		content.addChild(stage);
-
-		drawOverlay(gameData.resources);
-		content.addChild(overlay);
-
-		updRenderingBounds(zeroPoint);
-
-		resizeRenderer();
-
-		++state;
-
-		if (state == 2 && lastTime == undefined) {
-			lastTime = new Date();
-			velocityTick(new Date());
+	function sayHello() {
+		var type = "WebGL";
+		if (!PIXI.utils.isWebGLSupported()) {
+			type = "canvas";
 		}
-		console.log("GE.build finished");
+		PIXI.utils.sayHello(type);
 	};
 
-	this.updateChunk = (chunk) => {
-		console.log("chunk updated");
-		mapOfChunks[chunk.x][chunk.y] = chunk;
-		fillSpriteContainer(chunk.x, chunk.y);
-		updRenderingBounds(zeroPoint);
+	function buildPathList(ext) {
+		var res = [];
+		atlases_names.forEach( (e) => res.push(path(e, ext)) );
+		return res;
 	};
-
-	var R_text, G_text, B_text, M_text;
-
-	function shortText(x) {
-		let flr = Math.floor;
-		if (x < 1e4)
-			return `${x}`;
-		if (x < 1e7)
-			return `${flr(x / 1e3)}k`;
-		if (x < 1e10)
-			return `${flr(x / 1e6)}m`;
-		if (x < 1e13)
-			return `${flr(x / 1e9)}b`;
-		return "MANY";
-	}
-
-	this.updateResources = (data) => {
-		R_text.text = `${shortText(data.r)}`;
-		G_text.text = `${shortText(data.g)}`;
-		B_text.text = `${shortText(data.b)}`;
-		M_text.text = `${shortText(data.m)}`;
-		gl.render(content);
-	};
-
-	//setInterval(velocityTick, 20);
-
-	function path(atlas, ext) { return `client/img/${atlas}.${ext}`; };
-
-	function sprite(atlas, name) {
-		return new PIXI.Sprite(
-			PIXI.loader
-			.resources[path(atlas, 'json')]
-			.textures[`${name}.png`]
-		); 
-	};
-
-	function menuSprite(number) { return sprite('menu', `menu_${number}`); };
-	function buildSprite(number) { return sprite('buildings', `building_${number}`); };
-	function cellSprite(number) { return sprite('cell_colors', `cell_color_${number}`); };
-	function playerSprite(number) { return sprite('player_colors', `player_color_${number}`); };
-	function resourceSprite(cell, number) { return sprite('resources', `res_${cell ? 'color' : 'overlay'}_${number}`); };
 
 	const atlases_names = [
 		'buildings',
@@ -108,33 +35,200 @@ function GameEnvironment(PIXI, Papa, EE) {
 		'resources'
 	];
 
-	function buildPathList(ext) {
-		var res = [];
-		atlases_names.forEach( (e) => res.push(path(e, ext)) );
-		return res;
-	}
+	function path(atlas, ext) { return `client/img/${atlas}.${ext}`; };
 
-	function resizeRenderer() { 
-		gl.autoResize = true;
-		gl.resize(window.innerWidth, window.innerHeight);
-		gl.render(content);
-	};
-
-	function sayHello() {
-		var type = "WebGL";
-		if (!PIXI.utils.isWebGLSupported()) {
-			type = "canvas";
-		}
-		PIXI.utils.sayHello(type);
-	};
-
-	var progressText;
 	function showProgress(ext){
 		return (loader, resource) => {
 			console.log(`loading ${ext}. Progress: ${loader.progress}`);
 			//TODO: Normal progress bar
 		};
-	}
+	};
+
+	//Section 2: Build process
+
+	const content = new PIXI.Container(),
+	      stage = new PIXI.Container(),
+	      overlay = new PIXI.Container();
+
+	var state = 0;
+	const STATE_PLAY = 2;
+
+	var mapOfChunks;
+
+	this.build = (gameData) => {
+		getBounds(gameData.mapParams, gameData.homeCell);
+
+		mapOfChunks = gameData.buildings;
+		
+		fillSpriteArray(gameData.heightMap);
+		content.addChild(stage);
+
+		drawOverlay(gameData.resources, gameData.buiData);
+		content.addChild(overlay);
+
+		updRenderingBounds(zeroPoint);
+
+		resizeRenderer();
+
+		++state;
+
+		if (state == STATE_PLAY && lastTime == undefined) {
+			lastTime = new Date();
+			velocityTick(new Date());
+		}
+		console.log("GE.build finished");
+	};
+
+	//Section 3: Events-related stuff
+
+	this.moveScreenByPoint = (x, y) => {
+		if (initialWidth == undefined)
+			initialWidth = window.innerWidth;
+		var move = new CE.Point(x, y);
+		return () => {
+			infoText.hide(infoText.lastType);
+			trainText.hide();
+			menu['0'].hide();
+			focusVelocity = focusVelocity.add(move.mul(window.innerWidth / initialWidth));
+		}
+	};
+
+	this.addMouseListener = () => {
+		var data;
+
+		stage.interactive = true;
+		stage.on('mousedown', (event) => {
+			if (state < STATE_PLAY) return;
+
+			trainText.hide();
+
+			var relativePoint = event.data.getLocalPosition(stage);
+			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
+			                   .toOffset()
+			                   .toPoint();
+			updRenderingBounds(newFocus.sub(focus));
+			focus = newFocus;
+
+			var chunk = focus.toOffset().toChunk(),
+			    offset = focus.toOffset().sub(chunk.toOffset());
+			var tmp = {
+				cx: chunk.getX(),
+				cy: chunk.getY(),
+				dx: offset.getRow(),
+				dy: offset.getCol()
+			};
+			console.log(tmp);
+
+			menu['0'].hide();
+			menu['0'].visible = true;
+			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
+				data = {build: tmp};
+				menu['main_types'].show();
+			} else if (!resource(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
+				data = {coords: tmp};
+				menu['upgrade'].show();
+			}
+
+			boundsOnMapInPixels.pushFocus();
+			updRenderingBounds(zeroPoint);
+		}, {passive: true});
+
+		Papa.parse('./client/res/build-menu-links-table.csv', {
+			download: true,
+			header: true,
+			dynamicTyping: true,
+			step: function(row) {
+				var elem = row.data[0];
+				if (!elem.name.length) return;
+				menu[elem.name].interactive = true;
+				menu[elem.name].on('mousedown', (event) => {
+					if (state < STATE_PLAY) return;
+					//menu[elem.prev].visible = false;
+					menu[elem.next].visible = true;
+					if (data.build)
+						data.build.value = elem.value;
+					gl.render(content);
+				});
+				menu[elem.name].on('mouseover', (event) => {
+					infoText.push(elem.name);
+					gl.render(content);
+				});
+				menu[elem.name].on('mouseout', (event) => {
+					infoText.hide(elem.name);
+					gl.render(content);
+				});
+			},
+			complete: function(result) {
+				++state;
+				if (state == STATE_PLAY && lastTime == undefined) {
+					lastTime = new Date();
+					velocityTick(new Date());
+				}
+				console.log('parse finished');
+			}
+		});
+		menu['option0'].interactive = true;
+		menu['store_1'].hitArea = menu['option0'].hitArea = upperHalf;
+		menu['option0'].on('mousedown', (event) => {
+			if (state < STATE_PLAY) return;
+			data.option = false;
+			menu['0'].hide();
+			tryEmit(data);
+			gl.render(content);
+		});
+		menu['option1'].interactive = true;
+		menu['store_0'].hitArea = menu['option1'].hitArea = bottomHalf;
+		menu['option1'].on('mousedown', (event) => {
+			if (state < STATE_PLAY) return;
+			data.option = true;
+			menu['0'].hide();
+			tryEmit(data);
+			gl.render(content);
+		});
+		menu['remove'].interactive = true;
+		menu['remove'].on('mousedown', (event) => {
+			if (state < STATE_PLAY) return;
+			menu['0'].hide();
+			EE.emitRemoveBuilding(data.coords);
+			gl.render(content);
+		});
+	};
+
+	function empty(cx, cy, dx, dy) { return get(cx, cy, dx, dy) == undefined; };
+
+	function resource(cx, cy, dx, dy) {
+		let str = get(cx, cy, dx, dy);
+		if (str == undefined) return false;
+		return str.split("_")[1] == "-1";
+	};
+
+	function get(cx, cy, dx, dy) {
+		let a = mapOfChunks;
+		if (!(a[cx] && a[cx][cy] && a[cx][cy].arr && a[cx][cy].arr[dx]))
+			return undefined;
+		return a[cx][cy].arr[dx][dy];
+	};
+
+	function tryEmit(data) {
+		if (data.build)
+			EE.emitBuild(data);
+		else
+			EE.emitUpgradeBuilding(data);
+	};
+
+	this.showTrainText = () => {
+		trainText.show();
+		gl.render(content);
+	};
+
+	this.updateChunk = (chunk) => {
+		console.log("chunk updated");
+		mapOfChunks[chunk.x][chunk.y] = chunk;
+		fillBuildingSpriteContainer(chunk.x, chunk.y);
+		updRenderingBounds(zeroPoint);
+	};
+
+	//Section 4: Calculations
 
 	var cellSideSizeInPixels;
 	var mapSizeInCells, mapWidthInChunks, mapHeightInChunks;
@@ -145,6 +239,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 	var homeCell;
 	var boundsOnMapInPixels, d;
 	var focus, focusVelocity;
+
+	var zeroPoint;
 
 	var upperHalf, bottomHalf;
 
@@ -200,47 +296,127 @@ function GameEnvironment(PIXI, Papa, EE) {
 		};
 	};
 
-	this.resize = (window) => (event) => {
-		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
-		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
-		if (initialWidth == undefined)
-			initialWidth = window.innerWidth;
-		updateOverlayCoords(window.innerWidth / initialWidth);
-		stage.x = -focus.getX() + d.getX();
-		stage.y = -focus.getY() + d.getY();
-		resizeRenderer();
+	//Section 5.1: Graphics, field
+
+	function sprite(atlas, name) {
+		return new PIXI.Sprite(
+			PIXI.loader
+			.resources[path(atlas, 'json')]
+			.textures[`${name}.png`]
+		); 
 	};
 
-	function trueResize() {
-		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
-		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
-		if (initialWidth == undefined)
-			initialWidth = window.innerWidth;
-		updateOverlayCoords(window.innerWidth / initialWidth);
-		stage.x = -focus.getX() + d.getX();
-		stage.y = -focus.getY() + d.getY();
-		resizeRenderer();
-		console.log(`resize`);
+	function menuSprite(number) { return sprite('menu', `menu_${number}`); };
+	function buildSprite(number) { return sprite('buildings', `building_${number}`); };
+	function cellSprite(number) { return sprite('cell_colors', `cell_color_${number}`); };
+	function playerSprite(number) { return sprite('player_colors', `player_color_${number}`); };
+	function resourceSprite(cell, number) { return sprite('resources', `res_${cell ? 'color' : 'overlay'}_${number}`); };
+
+	var chunkContainers = [];
+	function fillSpriteArray(heightMap) {
+		for (let i = 0; i < mapWidthInChunks; ++i) {
+			chunkContainers[i] = [];
+			for (let j = 0; j < mapHeightInChunks; ++j) {
+				fillSpriteContainer(i, j, heightMap[i][j]);
+			}
+		}
+		console.log("sprite array filled");
 	};
 
-	const menu = [];
-	const trainText = new PIXI.Container();
+	function fillSpriteContainer(i, j, heightChunk) {
+		let cont = chunkContainers[i][j] = new PIXI.Container();
+		
+		var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
+		cont.x = pixelCoord.getX();
+		cont.y = pixelCoord.getY();
 
-	this.moveScreenByPoint = (x, y) => {
-		if (initialWidth == undefined)
-			initialWidth = window.innerWidth;
-		var move = new CE.Point(x, y);
-		return () => {
-			infoText.hide(infoText.lastType);
-			trainText.hide();
-			menu['0'].hide();
-			focusVelocity = focusVelocity.add(move.mul(window.innerWidth / initialWidth));
+		cont.terr = new PIXI.Container();
+		
+		for (let x = 0; x < chunkWidthInCells; ++x) {
+			if (!heightChunk.res[x]) break;
+			for (let y = 0; y < chunkHeightInCells; ++y) {
+				var cellSprite = getHeightCell(heightChunk.res[x][y]);
+				if (cellSprite) {
+					let pc = new CE.Offset(x, y).toPoint();
+					cellSprite.x = pc.getX();
+					cellSprite.y = pc.getY();
+					cont.terr.addChild(cellSprite);
+				}
+			}
+		}
+
+		cont.addChild(cont.terr);
+		fillBuildingSpriteContainer(i, j);
+
+		stage.addChild(cont);
+	};
+
+	function fillBuildingSpriteContainer(i, j) {
+		let cont = chunkContainers[i][j], bui;
+		if (cont.bui)
+			cont.removeChild(cont.bui);
+		cont.addChild(bui = cont.bui = new PIXI.Container());
+
+		for (let x = 0; x < chunkWidthInCells; ++x) {
+			for (let y = 0; y < chunkHeightInCells; ++y) {
+				var cellSprite = getBuildingCell(get(i, j, x, y)),
+				    pc = new CE.Offset(x, y).toPoint();
+				cellSprite.forEach((elem) => {
+					elem.x = pc.getX();
+					elem.y = pc.getY();
+					bui.addChild(elem);
+				});
+			}
 		}
 	};
 
-	this.showTrainText = () => {
-		trainText.show();
+	function getHeightIndex(val) {
+		with(Math) {
+			var ret = min(10, max(5 - floor(val * 4), 1));
+			return ret;
+		}
+	};
+	function getHeightCell(height) {
+		if (height !== undefined) return cellSprite(getHeightIndex(height));
+	};
+
+	function getBuildingCell(building) {
+		if (building == undefined)
+			return [];
+		var split = building.split("_");
+		if (split[1] == '-1' && Number(split[0]) < 0)
+			return [resourceSprite(true, -Number(split[0]))];
+		else
+			return [playerSprite(split[1]), buildSprite(split[0])];
+	};
+
+	//Section 5.2: Graphics, overlay
+
+	const menu = [],
+	      trainText = new PIXI.Container(),
+	      infoText = new PIXI.Container(),
+	      resourceRect = new PIXI.Container();
+
+	var R_text, G_text, B_text, M_text;
+	this.updateResources = (data) => {
+		R_text.text = `${shortText(data.r)}`;
+		G_text.text = `${shortText(data.g)}`;
+		B_text.text = `${shortText(data.b)}`;
+		M_text.text = `${shortText(data.m)}`;
 		gl.render(content);
+	};
+
+	function shortText(x) {
+		let flr = Math.floor;
+		if (x < 1e4)
+			return `${x}`;
+		if (x < 1e7)
+			return `${flr(x / 1e3)}k`;
+		if (x < 1e10)
+			return `${flr(x / 1e6)}m`;
+		if (x < 1e13)
+			return `${flr(x / 1e9)}b`;
+		return "MANY";
 	};
 
 	function getInformationText(name) {
@@ -252,235 +428,9 @@ function GameEnvironment(PIXI, Papa, EE) {
 			return 'Cargo sends to you product of II';
 		if (name == 'upgrade_0')
 			return 'Upgrade building';
-	}
-
-	const infoText = new PIXI.Container(), infoTextsList = [];
-	infoText.show = (mode) => {
-		infoText.concrete_bg.visible = infoText.concrete.visible = mode;
-		infoText.abstract_bg.visible = infoText.abstract.visible = !mode;
-		infoText.visible = true;
-	}
-	infoText.lastType = '';
-	infoText.push = (name) => {
-		infoText.lastType = name;
-		var check = buildInfo.some((elem) => {
-			if (elem.func != name)
-				return false;
-			
-			infoTextsList['in'].text = `inputs ${elem.in} packs per process, ${elem.in_u} after each upgrade`;
-			infoTextsList['time'].text = `takes ${elem.time} ticks to process, ${elem.time_u} after each upgrade`;
-			infoTextsList['out'].text = `outputs ${elem.out} ${name == 'sell' ? '$' : 'packs'} per process, ${elem.out_u} after each upgrade`;
-
-			let r = elem.cost_r == -1 ? '?' : elem.cost_r,
-			    g = elem.cost_g == -1 ? '?' : elem.cost_g,
-			    b = elem.cost_b == -1 ? '?' : elem.cost_b,
-			    m = elem.cost_gold == -1 ? '?' : elem.cost_gold;
-			
-			infoTextsList['cost'].text = `${r}r + ${g}g + ${b}b or ${m}$, ${elem.cost_u} for each upgrade`;
-			infoText.show(1);
-
-			return true;
-		});
-		if (!check) {
-			infoTextsList['info'].text = getInformationText(name);
-			infoText.show(0);
-		}
-	}
-	infoText.hide = (name) => {
-		if (infoText.lastType != name) return;
-		infoText.visible = false;
-		infoText.concrete_bg.visible = false;
-		infoText.concrete.visible = false;
-		infoText.abstract_bg.visible = false;
-		infoText.abstract.visible = false;
-	}
-
-	this.addMouseListener = () => {
-		var data;
-
-		stage.interactive = true;
-		stage.on('mousedown', (event) => {
-			if (state < 2) return;
-
-			trainText.hide();
-
-			var relativePoint = event.data.getLocalPosition(stage);
-			var newFocus = new CE.Point(relativePoint.x, relativePoint.y)
-			                   .toOffset()
-			                   .toPoint();
-			updRenderingBounds(newFocus.sub(focus));
-			focus = newFocus;
-
-			var chunk = focus.toOffset().toChunk(),
-			    offset = focus.toOffset().sub(chunk.toOffset());
-			var tmp = {
-				cx: chunk.getX(),
-				cy: chunk.getY(),
-				dx: offset.getRow(),
-				dy: offset.getCol()
-			};
-			console.log(tmp);
-
-			menu['0'].hide();
-			menu['0'].visible = true;
-			if (empty(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
-				data = {build: tmp};
-				menu['main_types'].show();
-			} else if (!resource(tmp.cx, tmp.cy, tmp.dx, tmp.dy)) {
-				data = {coords: tmp};
-				menu['upgrade'].show();
-			}
-
-			boundsOnMapInPixels.pushFocus();
-			updRenderingBounds(zeroPoint);
-		}, {passive: true});
-
-		Papa.parse('./client/res/build-menu-links-table.csv', {
-			download: true,
-			header: true,
-			dynamicTyping: true,
-			step: function(row) {
-				var elem = row.data[0];
-				if (!elem.name.length) return;
-				menu[elem.name].interactive = true;
-				menu[elem.name].on('mousedown', (event) => {
-					if (state < 2) return;
-					//menu[elem.prev].visible = false;
-					menu[elem.next].visible = true;
-					if (data.build)
-						data.build.value = elem.value;
-					gl.render(content);
-				});
-				menu[elem.name].on('mouseover', (event) => {
-					infoText.push(elem.name);
-					gl.render(content);
-				});
-				menu[elem.name].on('mouseout', (event) => {
-					infoText.hide(elem.name);
-					gl.render(content);
-				});
-			},
-			complete: function(result) {
-				++state;
-				if (state == 2 && lastTime == undefined) {
-					lastTime = new Date();
-					velocityTick(new Date());
-				}
-				console.log('parse finished');
-			}
-		});
-		menu['option0'].interactive = true;
-		menu['store_1'].hitArea = menu['option0'].hitArea = upperHalf;
-		menu['option0'].on('mousedown', (event) => {
-			if (state < 2) return;
-			data.option = false;
-			menu['0'].hide();
-			tryEmit(data);
-			gl.render(content);
-		});
-		menu['option1'].interactive = true;
-		menu['store_0'].hitArea = menu['option1'].hitArea = bottomHalf;
-		menu['option1'].on('mousedown', (event) => {
-			if (state < 2) return;
-			data.option = true;
-			menu['0'].hide();
-			tryEmit(data);
-			gl.render(content);
-		});
-		menu['remove'].interactive = true;
-		menu['remove'].on('mousedown', (event) => {
-			if (state < 2) return;
-			menu['0'].hide();
-			EE.emitRemoveBuilding(data.coords);
-			gl.render(content);
-		});
 	};
 
-	function empty(cx, cy, dx, dy) { return get(cx, cy, dx, dy) == undefined; };
-
-	function resource(cx, cy, dx, dy) {
-		let str = get(cx, cy, dx, dy);
-		if (str == undefined) return false;
-		return str.split("_")[1] == "-1";
-	}
-
-	function get(cx, cy, dx, dy) {
-		let a = mapOfChunks;
-		if (!(a[cx] && a[cx][cy] && a[cx][cy].arr && a[cx][cy].arr[dx]))
-			return undefined;
-		return a[cx][cy].arr[dx][dy];
-	}
-
-	function tryEmit(data) {
-		if (data.build)
-			EE.emitBuild(data);
-		else
-			EE.emitUpgradeBuilding(data);
-	};
-
-	var chunkContainers = [[]];
-	function fillSpriteArray() {
-		for (let i = 0; i < mapWidthInChunks; ++i) {
-			chunkContainers[i] = [];
-			for (let j = 0; j < mapHeightInChunks; ++j) {
-				fillSpriteContainer(i, j);
-			}
-		}
-		console.log("sprite array filled");
-	};
-
-	function fillSpriteContainer(i, j) {
-		if (chunkContainers[i][j] != undefined)
-			stage.removeChild(chunkContainers[i][j]);
-		chunkContainers[i][j] = new PIXI.Container();
-
-		var pixelCoord = new CE.Chunk(i, j).upperLeftPixel();
-		chunkContainers[i][j].x = pixelCoord.getX();
-		chunkContainers[i][j].y = pixelCoord.getY();
-
-		for (let x = 0; x < chunkWidthInCells; ++x) {
-			if (!heightMap[i][j].res[x]) break;
-			for (let y = 0; y < chunkHeightInCells; ++y) {
-				var cellSprite = getSpriteOfCell(i, j, x, y),
-				    pc = new CE.Offset(x, y).toPoint();
-				cellSprite.forEach((elem) => {
-					elem.x = pc.getX();
-					elem.y = pc.getY();
-					chunkContainers[i][j].addChild(elem);
-				});
-			}
-		}
-		stage.addChild(chunkContainers[i][j]);
-	};
-
-	function height(val) {
-		with(Math) {
-			var ret = min(10, max(5 - floor(val / maxHeight * 4), 1));
-			return ret;
-		}
-	}
-
-	function getSpriteOfCell(i, j, x, y) {
-		if (
-			heightMap[i][j].res[x] === undefined 
-			|| heightMap[i][j].res[x][y] === undefined
-			) return [];
-
-		var heightCell = cellSprite(height(heightMap[i][j].res[x][y]));
-
-		if (empty(i, j, x, y)) return [heightCell];
-		
-		var split = mapOfChunks[i][j].arr[x][y].split("_");
-
-		if (split[1] == '-1' && Number(split[0]) < 0)
-			return [heightCell, resourceSprite(true, -Number(split[0]))];
-		else
-			return [heightCell, playerSprite(split[1]), buildSprite(split[0])];
-	};
-
-	var resourceRect;
-
-	function drawOverlay(resources) {
+	function drawOverlay(resources, buildInfo) {
 		overlay.addChild(menu['0'] = new PIXI.Container());
 
 		let zeroOffset = new CE.Offset(0, 0), upLeft = zeroOffset.upperLeftPixel();
@@ -667,7 +617,6 @@ function GameEnvironment(PIXI, Papa, EE) {
 		graphics.lineTo(0 + margin, 0 + margin);
 		graphics.endFill();
 
-		resourceRect = new PIXI.Sprite();
 		resourceRect.x = 0;
 		resourceRect.y = 0;
 		resourceRect.addChild(
@@ -679,6 +628,47 @@ function GameEnvironment(PIXI, Papa, EE) {
 		overlay.addChild(resourceRect);
 
 		var newFont = { font : `${h / 2}px Arial`, fill : 0x00FF00 };
+
+		var infoTextsList = [];
+		infoText.show = (mode) => {
+			infoText.concrete_bg.visible = infoText.concrete.visible = mode;
+			infoText.abstract_bg.visible = infoText.abstract.visible = !mode;
+			infoText.visible = true;
+		}
+		infoText.lastType = '';
+		infoText.push = (name) => {
+			infoText.lastType = name;
+			var check = buildInfo.some((elem) => {
+				if (elem.func != name)
+					return false;
+				
+				infoTextsList['in'].text = `inputs ${elem.in} packs per process, ${elem.in_u} after each upgrade`;
+				infoTextsList['time'].text = `takes ${elem.time} ticks to process, ${elem.time_u} after each upgrade`;
+				infoTextsList['out'].text = `outputs ${elem.out} ${name == 'sell' ? '$' : 'packs'} per process, ${elem.out_u} after each upgrade`;
+
+				let r = elem.cost_r == -1 ? '?' : elem.cost_r,
+				    g = elem.cost_g == -1 ? '?' : elem.cost_g,
+				    b = elem.cost_b == -1 ? '?' : elem.cost_b,
+				    m = elem.cost_gold == -1 ? '?' : elem.cost_gold;
+				
+				infoTextsList['cost'].text = `${r}r + ${g}g + ${b}b or ${m}$, ${elem.cost_u} for each upgrade`;
+				infoText.show(1);
+
+				return true;
+			});
+			if (!check) {
+				infoTextsList['info'].text = getInformationText(name);
+				infoText.show(0);
+			}
+		}
+		infoText.hide = (name) => {
+			if (infoText.lastType != name) return;
+			infoText.visible = false;
+			infoText.concrete_bg.visible = false;
+			infoText.concrete.visible = false;
+			infoText.abstract_bg.visible = false;
+			infoText.abstract.visible = false;
+		}
 
 		infoText.concrete = new PIXI.Container();
 		infoText.concrete.addChild(
@@ -766,6 +756,8 @@ function GameEnvironment(PIXI, Papa, EE) {
 		updateOverlayCoords(1);
 	};
 
+	//Section 6: Render
+
 	function updateOverlayCoords(scale) {
 		menu['0'].x = d.getX()
 		menu['0'].y = d.getY();
@@ -783,17 +775,35 @@ function GameEnvironment(PIXI, Papa, EE) {
 		trainText.scale.x = trainText.scale.y = scale;
 	};
 
+	var initialWidth = undefined;
+	function resize() {
+		focusVelocity = focusVelocity.mul(window.innerWidth / 2 / d.getX());
+		d = new CE.Point(window.innerWidth / 2, window.innerHeight / 2);
+		if (initialWidth == undefined)
+			initialWidth = window.innerWidth;
+		updateOverlayCoords(window.innerWidth / initialWidth);
+		stage.x = -focus.getX() + d.getX();
+		stage.y = -focus.getY() + d.getY();
+		resizeRenderer();
+	};
+
+	function resizeRenderer() { 
+		gl.autoResize = true;
+		gl.resize(window.innerWidth, window.innerHeight);
+		gl.render(content);
+	};
+
 	var lastTime;
 	function velocityTick(time) {
 		var dt = time - lastTime;
 		lastTime = time;
-		if (state == 2 && !focusVelocity.equals(zeroPoint)) {
+		if (state == STATE_PLAY && !focusVelocity.equals(zeroPoint)) {
 			focus = focus.add(focusVelocity.mul(dt));
 			boundsOnMapInPixels.pushFocus();
 			updRenderingBounds(focusVelocity.mul(dt));
 		}
 		if (window.innerWidth / 2 != d.getX()) {
-			trueResize();
+			resize();
 			if (focusVelocity.equals(zeroPoint)) {
 				boundsOnMapInPixels.pushFocus();
 				updRenderingBounds(zeroPoint);
