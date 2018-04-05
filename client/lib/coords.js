@@ -192,6 +192,4 @@ function CoordsEnvironment(hexSize, chunkWidth, chunkHeight) {
     ];
 };
 
-module.exports = {
-    CoordsEnvironment: CoordsEnvironment
-};
+module.exports = CoordsEnvironment;
