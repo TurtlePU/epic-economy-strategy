@@ -31,11 +31,10 @@ io.sockets.on('connection', (socket) => {
 	if (countLoads == numberOfParses) {
 		if (!Field) {
 			mapData = parses[table_names[0]];
-			buiData = parses[table_names[2]];
 			Player = require('./lib/player')(parses[table_names[1]], io);
 			Field = require('./lib/field')(
-				new build_gen.buildingFactory(parses[table_names[2]]), 
-				build_gen.resourceSourceBuilder(parses[table_names[1]]), 
+				new build_gen.buildingFactory(buiData = parses[table_names[2]]),
+				build_gen.resourceSourceBuilder(parses[table_names[1]]),
 				parses[table_names[3]],
 				require('./lib/map_gen'),
 				require('./client/lib/coords'),
